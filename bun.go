@@ -26,14 +26,14 @@ func (s *BunTransaction) Commit(ctx context.Context) error {
 	return s.tx.Commit()
 }
 
-func (s *BunTransaction) Rollback(ctx context.Context) {
+func (s *BunTransaction) Rollback(ctx context.Context) error {
 	s.clearTx()
 
-	_ = s.tx.Rollback()
+	return s.tx.Rollback()
 }
 
 func (s *BunTransaction) clearTx() {
-	s.once.Do(func() { s.ctx = clearTx(s.ctx) })
+	s.once.Do(func() { s.ctx = ClearTx(s.ctx) })
 }
 
 type BunProvider struct {
@@ -65,7 +65,7 @@ func (s *BunProvider) BeginTx(ctx context.Context, opts sql.TxOptions) (Transact
 }
 
 func (s *BunProvider) transactionContext(ctx context.Context, tx *bun.Tx) context.Context {
-	return context.WithValue(startTx(ctx), bunTxKey{}, tx)
+	return context.WithValue(StartTx(ctx), bunTxKey{}, tx)
 }
 
 func (s *BunProvider) Executor(ctx context.Context) bun.IDB {

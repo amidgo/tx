@@ -10,7 +10,7 @@ import (
 )
 
 func Test_ContextMatcher(t *testing.T) {
-	ctx := transaction.MockEnableTxContext(context.Background())
+	ctx := transaction.StartTx(context.Background())
 
 	require.True(t, mocks.TxEnabled.Matches(ctx))
 	require.False(t, mocks.TxDisabled.Matches(ctx))

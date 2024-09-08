@@ -3,65 +3,33 @@ package mocks
 import (
 	"context"
 	"database/sql"
-	"sync"
 	"sync/atomic"
 
 	"github.com/amidgo/transaction"
 )
 
-type testReporter interface {
-	Fatalf(format string, args ...any)
-	Fatal(args ...any)
-	Cleanup(func())
+type providerAsserter interface {
+	assert()
+	begin() (transaction.Transaction, error)
+	beginTx(sql.TxOptions) (transaction.Transaction, error)
 }
 
 type Provider struct {
-	t    testReporter
-	once sync.Once
 	asrt providerAsserter
 }
 
-func NewProvider(t testReporter) *Provider {
-	p := &Provider{t: t}
+func newProvider(t testReporter, asrt providerAsserter) transaction.Provider {
+	t.Cleanup(asrt.assert)
 
-	t.Cleanup(
-		func() {
-			if p.asrt != nil {
-				p.asrt.assert()
-			}
-		},
-	)
-
-	return p
+	return &Provider{asrt: asrt}
 }
 
 func (p *Provider) Begin(context.Context) (transaction.Transaction, error) {
-	if p.asrt == nil {
-		p.t.Fatal("unexpected call to provider.Begin")
-
-		return nil, nil
-	}
-
 	return p.asrt.begin()
 }
 
 func (p *Provider) BeginTx(_ context.Context, opts sql.TxOptions) (transaction.Transaction, error) {
-	if p.asrt == nil {
-		p.t.Fatal("unexpected call to provider.BeginTx")
-
-		return nil, nil
-	}
-
 	return p.asrt.beginTx(opts)
-}
-
-func (p *Provider) ExpectBeginAndReturnError(beginError error) {
-	p.setAsserter(
-		&beginAndReturnError{
-			t:   p.t,
-			err: beginError,
-		},
-	)
 }
 
 type beginAndReturnError struct {
@@ -90,16 +58,6 @@ func (b *beginAndReturnError) assert() {
 	if !called {
 		b.t.Fatal("provider assertion failed, no calls occurred")
 	}
-}
-
-func (p *Provider) ExpectBeginTxAndReturnError(beginError error, expectedOpts sql.TxOptions) {
-	p.setAsserter(
-		&beginTxAndReturnError{
-			t:            p.t,
-			err:          beginError,
-			expectedOpts: expectedOpts,
-		},
-	)
 }
 
 type beginTxAndReturnError struct {
@@ -135,15 +93,6 @@ func (b *beginTxAndReturnError) assert() {
 	}
 }
 
-func (p *Provider) ExpectBeginAndReturnTx(tx transaction.Transaction) {
-	p.setAsserter(
-		&beginAndReturnTx{
-			t:  p.t,
-			tx: tx,
-		},
-	)
-}
-
 type beginAndReturnTx struct {
 	t      testReporter
 	tx     transaction.Transaction
@@ -170,16 +119,6 @@ func (b *beginAndReturnTx) assert() {
 	if !called {
 		b.t.Fatal("provider assertion failed, no calls occurred")
 	}
-}
-
-func (p *Provider) ExpectBeginTxAndReturnTx(tx transaction.Transaction, opts sql.TxOptions) {
-	p.setAsserter(
-		&beginTxAndReturnTx{
-			t:            p.t,
-			tx:           tx,
-			expectedOpts: opts,
-		},
-	)
 }
 
 type beginTxAndReturnTx struct {
@@ -213,14 +152,4 @@ func (b *beginTxAndReturnTx) assert() {
 	if !called {
 		b.t.Fatal("provider assertion failed, no calls occurred")
 	}
-}
-
-type providerAsserter interface {
-	assert()
-	begin() (transaction.Transaction, error)
-	beginTx(sql.TxOptions) (transaction.Transaction, error)
-}
-
-func (p *Provider) setAsserter(asrt providerAsserter) {
-	p.once.Do(func() { p.asrt = asrt })
 }

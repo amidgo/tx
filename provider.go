@@ -9,7 +9,7 @@ import (
 type Transaction interface {
 	Context() context.Context
 	Commit(ctx context.Context) error
-	Rollback(ctx context.Context)
+	Rollback(ctx context.Context) error
 }
 
 type Provider interface {
@@ -32,7 +32,7 @@ func WithProvider(
 		tx: tx,
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	err = withTx(tx.Context())
 	if err != nil {
@@ -52,12 +52,12 @@ type notRollbackAfterCommit struct {
 	commited bool
 }
 
-func (r *notRollbackAfterCommit) Rollback(ctx context.Context) {
+func (r *notRollbackAfterCommit) Rollback(ctx context.Context) error {
 	if r.commited {
-		return
+		return nil
 	}
 
-	r.tx.Rollback(ctx)
+	return r.tx.Rollback(ctx)
 }
 
 func (r *notRollbackAfterCommit) Commit(ctx context.Context) error {

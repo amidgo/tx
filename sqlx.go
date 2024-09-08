@@ -26,14 +26,14 @@ func (s *SqlxTransaction) Commit(ctx context.Context) error {
 	return s.tx.Commit()
 }
 
-func (s *SqlxTransaction) Rollback(ctx context.Context) {
+func (s *SqlxTransaction) Rollback(ctx context.Context) error {
 	s.clearTx()
 
-	_ = s.tx.Rollback()
+	return s.tx.Rollback()
 }
 
 func (s *SqlxTransaction) clearTx() {
-	s.once.Do(func() { s.ctx = clearTx(s.ctx) })
+	s.once.Do(func() { s.ctx = ClearTx(s.ctx) })
 }
 
 type SqlxProvider struct {
@@ -65,7 +65,7 @@ func (s *SqlxProvider) BeginTx(ctx context.Context, opts sql.TxOptions) (Transac
 }
 
 func (s *SqlxProvider) transactionContext(ctx context.Context, tx *sqlx.Tx) context.Context {
-	return context.WithValue(startTx(ctx), sqlxTxKey{}, tx)
+	return context.WithValue(StartTx(ctx), sqlxTxKey{}, tx)
 }
 
 func (s *SqlxProvider) Executor(ctx context.Context) SQLXExecutor {

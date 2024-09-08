@@ -2,74 +2,52 @@ package mocks
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 
 	"github.com/amidgo/transaction"
 )
 
-type Transaction struct {
-	t    testReporter
-	asrt transactionAsserter
-	once sync.Once
+type transactionAsserter interface {
+	rollback() error
+	commit() error
+	assert()
 }
 
-func NewTransaction(t testReporter) *Transaction {
-	tx := &Transaction{t: t}
+type Transaction struct {
+	asrt transactionAsserter
+}
 
-	t.Cleanup(
-		func() {
-			if tx.asrt != nil {
-				tx.asrt.assert()
-			}
-		},
-	)
+func newTransaction(t testReporter, asrt transactionAsserter) *Transaction {
+	t.Cleanup(asrt.assert)
 
-	return tx
+	return &Transaction{asrt: asrt}
 }
 
 func (t *Transaction) Commit(context.Context) error {
-	if t.asrt == nil {
-		t.t.Fatal("unexpected call to tx.Commit")
-
-		return nil
-	}
-
 	return t.asrt.commit()
 }
 
-func (t *Transaction) Rollback(context.Context) {
-	if t.asrt == nil {
-		t.t.Fatal("unexpected call to tx.Rollback")
-
-		return
-	}
-
-	t.asrt.rollback()
+func (t *Transaction) Rollback(context.Context) error {
+	return t.asrt.rollback()
 }
 
 func (t *Transaction) Context() context.Context {
-	return transaction.MockEnableTxContext(context.Background())
-}
-
-func (t *Transaction) ExpectRollback() {
-	t.setAsserter(
-		&rollback{
-			t: t.t,
-		},
-	)
+	return transaction.StartTx(context.Background())
 }
 
 type rollback struct {
 	t      testReporter
+	err    error
 	called atomic.Bool
 }
 
-func (r *rollback) rollback() {
+func (r *rollback) rollback() error {
 	swapped := r.called.CompareAndSwap(false, true)
 	if !swapped {
 		r.t.Fatal("unexpected call, tx.Rollback called more than once")
 	}
+
+	return r.err
 }
 
 func (r *rollback) commit() error {
@@ -85,21 +63,15 @@ func (r *rollback) assert() {
 	}
 }
 
-func (t *Transaction) ExpectCommit() {
-	t.setAsserter(
-		&commit{
-			t: t.t,
-		},
-	)
-}
-
 type commit struct {
 	t      testReporter
 	called atomic.Bool
 }
 
-func (c *commit) rollback() {
+func (c *commit) rollback() error {
 	c.t.Fatal("unexpected call to tx.Rollback, expected one call to tx.Commit")
+
+	return nil
 }
 
 func (c *commit) commit() error {
@@ -117,15 +89,6 @@ func (c *commit) assert() {
 	}
 }
 
-func (t *Transaction) ExpectRollbackAfterFailedCommit(commitErr error) {
-	t.setAsserter(
-		&rollbackAfterFailedCommit{
-			t:   t.t,
-			err: commitErr,
-		},
-	)
-}
-
 const (
 	notCommited int32 = iota
 	commited
@@ -138,11 +101,13 @@ type rollbackAfterFailedCommit struct {
 	err   error
 }
 
-func (t *rollbackAfterFailedCommit) rollback() {
+func (t *rollbackAfterFailedCommit) rollback() error {
 	swapped := t.state.CompareAndSwap(commited, rollbacked)
 	if !swapped {
 		t.t.Fatal("unexpected call, tx.Commit has not been called yet or tx.Rollback has been already called")
 	}
+
+	return nil
 }
 
 func (t *rollbackAfterFailedCommit) commit() error {
@@ -165,12 +130,20 @@ func (t *rollbackAfterFailedCommit) assert() {
 	}
 }
 
-func (t *Transaction) setAsserter(asrt transactionAsserter) {
-	t.once.Do(func() { t.asrt = asrt })
+type nothing struct {
+	t testReporter
 }
 
-type transactionAsserter interface {
-	rollback()
-	commit() error
-	assert()
+func (n *nothing) rollback() error {
+	n.t.Fatal("unexpected call to tx.Rollback")
+
+	return nil
 }
+
+func (n *nothing) commit() error {
+	n.t.Fatal("unexpected call to tx.Commit")
+
+	return nil
+}
+
+func (n *nothing) assert() {}
