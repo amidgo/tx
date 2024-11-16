@@ -1,40 +1,40 @@
 package buntransaction
 
 import (
-	context "context"
-	sql "database/sql"
+	"context"
+	"database/sql"
 	"sync"
 
-	"github.com/amidgo/transaction"
+	ttn "github.com/amidgo/transaction"
 	"github.com/uptrace/bun"
 )
 
 type txKey struct{}
 
-type Transaction struct {
+type transaction struct {
 	tx   *bun.Tx
 	ctx  context.Context
 	once sync.Once
 }
 
-func (s *Transaction) Context() context.Context {
+func (s *transaction) Context() context.Context {
 	return s.ctx
 }
 
-func (s *Transaction) Commit(ctx context.Context) error {
+func (s *transaction) Commit(ctx context.Context) error {
 	s.clearTx()
 
 	return s.tx.Commit()
 }
 
-func (s *Transaction) Rollback(ctx context.Context) error {
+func (s *transaction) Rollback(ctx context.Context) error {
 	s.clearTx()
 
 	return s.tx.Rollback()
 }
 
-func (s *Transaction) clearTx() {
-	s.once.Do(func() { s.ctx = transaction.ClearTx(s.ctx) })
+func (s *transaction) clearTx() {
+	s.once.Do(func() { s.ctx = ttn.ClearTx(s.ctx) })
 }
 
 type Provider struct {
@@ -47,26 +47,26 @@ func NewProvider(db *bun.DB) *Provider {
 	}
 }
 
-func (s *Provider) Begin(ctx context.Context) (transaction.Transaction, error) {
+func (s *Provider) Begin(ctx context.Context) (ttn.Transaction, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Transaction{tx: &tx, ctx: s.transactionContext(ctx, &tx)}, nil
+	return &transaction{tx: &tx, ctx: s.transactionContext(ctx, &tx)}, nil
 }
 
-func (s *Provider) BeginTx(ctx context.Context, opts sql.TxOptions) (transaction.Transaction, error) {
+func (s *Provider) BeginTx(ctx context.Context, opts sql.TxOptions) (ttn.Transaction, error) {
 	tx, err := s.db.BeginTx(ctx, &opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Transaction{tx: &tx, ctx: s.transactionContext(ctx, &tx)}, nil
+	return &transaction{tx: &tx, ctx: s.transactionContext(ctx, &tx)}, nil
 }
 
 func (s *Provider) transactionContext(ctx context.Context, tx *bun.Tx) context.Context {
-	return context.WithValue(transaction.StartTx(ctx), txKey{}, tx)
+	return context.WithValue(ttn.StartTx(ctx), txKey{}, tx)
 }
 
 func (s *Provider) Executor(ctx context.Context) bun.IDB {
@@ -82,7 +82,7 @@ func (s *Provider) TxEnabled(ctx context.Context) bool {
 }
 
 func (s *Provider) executor(ctx context.Context) (bun.IDB, bool) {
-	if !transaction.TxEnabled(ctx) {
+	if !ttn.TxEnabled(ctx) {
 		return s.db, false
 	}
 

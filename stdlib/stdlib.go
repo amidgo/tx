@@ -5,35 +5,35 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/amidgo/transaction"
+	ttn "github.com/amidgo/transaction"
 )
 
 type txKey struct{}
 
-type SQLTransaction struct {
+type transaction struct {
 	tx   *sql.Tx
 	ctx  context.Context
 	once sync.Once
 }
 
-func (s *SQLTransaction) Context() context.Context {
+func (s *transaction) Context() context.Context {
 	return s.ctx
 }
 
-func (s *SQLTransaction) Commit(ctx context.Context) error {
+func (s *transaction) Commit(ctx context.Context) error {
 	s.clearTx()
 
 	return s.tx.Commit()
 }
 
-func (s *SQLTransaction) Rollback(ctx context.Context) error {
+func (s *transaction) Rollback(ctx context.Context) error {
 	s.clearTx()
 
 	return s.tx.Rollback()
 }
 
-func (s *SQLTransaction) clearTx() {
-	s.once.Do(func() { s.ctx = transaction.ClearTx(s.ctx) })
+func (s *transaction) clearTx() {
+	s.once.Do(func() { s.ctx = ttn.ClearTx(s.ctx) })
 }
 
 type Provider struct {
@@ -44,26 +44,26 @@ func NewProvider(db *sql.DB) *Provider {
 	return &Provider{db: db}
 }
 
-func (s *Provider) Begin(ctx context.Context) (transaction.Transaction, error) {
+func (s *Provider) Begin(ctx context.Context) (ttn.Transaction, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
 
-	return &SQLTransaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
+	return &transaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
 }
 
-func (s *Provider) BeginTx(ctx context.Context, opts sql.TxOptions) (transaction.Transaction, error) {
+func (s *Provider) BeginTx(ctx context.Context, opts sql.TxOptions) (ttn.Transaction, error) {
 	tx, err := s.db.BeginTx(ctx, &opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SQLTransaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
+	return &transaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
 }
 
 func (s *Provider) transactionContext(ctx context.Context, tx *sql.Tx) context.Context {
-	return context.WithValue(transaction.StartTx(ctx), txKey{}, tx)
+	return context.WithValue(ttn.StartTx(ctx), txKey{}, tx)
 }
 
 func (s *Provider) Executor(ctx context.Context) Executor {
@@ -79,7 +79,7 @@ func (s *Provider) TxEnabled(ctx context.Context) bool {
 }
 
 func (s *Provider) executor(ctx context.Context) (Executor, bool) {
-	if !transaction.TxEnabled(ctx) {
+	if !ttn.TxEnabled(ctx) {
 		return s.db, false
 	}
 
