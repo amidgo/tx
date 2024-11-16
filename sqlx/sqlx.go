@@ -1,87 +1,88 @@
-package transaction
+package sqlxtransaction
 
 import (
 	context "context"
 	sql "database/sql"
 	"sync"
 
+	"github.com/amidgo/transaction"
 	"github.com/jmoiron/sqlx"
 )
 
 type sqlxTxKey struct{}
 
-type SqlxTransaction struct {
+type Transaction struct {
 	tx   *sqlx.Tx
 	ctx  context.Context
 	once sync.Once
 }
 
-func (s *SqlxTransaction) Context() context.Context {
+func (s *Transaction) Context() context.Context {
 	return s.ctx
 }
 
-func (s *SqlxTransaction) Commit(ctx context.Context) error {
+func (s *Transaction) Commit(ctx context.Context) error {
 	s.clearTx()
 
 	return s.tx.Commit()
 }
 
-func (s *SqlxTransaction) Rollback(ctx context.Context) error {
+func (s *Transaction) Rollback(ctx context.Context) error {
 	s.clearTx()
 
 	return s.tx.Rollback()
 }
 
-func (s *SqlxTransaction) clearTx() {
-	s.once.Do(func() { s.ctx = ClearTx(s.ctx) })
+func (s *Transaction) clearTx() {
+	s.once.Do(func() { s.ctx = transaction.ClearTx(s.ctx) })
 }
 
-type SqlxProvider struct {
+type Provider struct {
 	db *sqlx.DB
 }
 
-func NewSqlxProvider(db *sqlx.DB) *SqlxProvider {
-	return &SqlxProvider{
+func NewProvider(db *sqlx.DB) *Provider {
+	return &Provider{
 		db: db,
 	}
 }
 
-func (s *SqlxProvider) Begin(ctx context.Context) (Transaction, error) {
+func (s *Provider) Begin(ctx context.Context) (transaction.Transaction, error) {
 	tx, err := s.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelDefault, ReadOnly: false})
 	if err != nil {
 		return nil, err
 	}
 
-	return &SqlxTransaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
+	return &Transaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
 }
 
-func (s *SqlxProvider) BeginTx(ctx context.Context, opts sql.TxOptions) (Transaction, error) {
+func (s *Provider) BeginTx(ctx context.Context, opts sql.TxOptions) (transaction.Transaction, error) {
 	tx, err := s.db.BeginTxx(ctx, &opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SqlxTransaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
+	return &Transaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
 }
 
-func (s *SqlxProvider) transactionContext(ctx context.Context, tx *sqlx.Tx) context.Context {
-	return context.WithValue(StartTx(ctx), sqlxTxKey{}, tx)
+func (s *Provider) transactionContext(ctx context.Context, tx *sqlx.Tx) context.Context {
+	return context.WithValue(transaction.StartTx(ctx), sqlxTxKey{}, tx)
 }
 
-func (s *SqlxProvider) Executor(ctx context.Context) SQLXExecutor {
+func (s *Provider) Executor(ctx context.Context) Executor {
 	executor, _ := s.executor(ctx)
 
 	return executor
 }
 
-func (s *SqlxProvider) TxEnabled(ctx context.Context) bool {
+func (s *Provider) TxEnabled(ctx context.Context) bool {
 	_, ok := s.executor(ctx)
 
 	return ok
 }
 
-func (s *SqlxProvider) executor(ctx context.Context) (SQLXExecutor, bool) {
-	if !TxEnabled(ctx) {
+func (s *Provider) executor(ctx context.Context) (Executor, bool) {
+	if !transaction.TxEnabled(ctx) {
 		return s.db, false
 	}
 
@@ -93,7 +94,7 @@ func (s *SqlxProvider) executor(ctx context.Context) (SQLXExecutor, bool) {
 	return tx, true
 }
 
-type SQLXExecutor interface {
+type Executor interface {
 	BindNamed(query string, arg interface{}) (string, []interface{}, error)
 	DriverName() string
 	Exec(query string, args ...any) (sql.Result, error)

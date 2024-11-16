@@ -7,6 +7,7 @@ import (
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
 	"github.com/amidgo/transaction"
+	stdlibtransaction "github.com/amidgo/transaction/stdlib"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +18,7 @@ func Test_SQLProvider_Begin_BeginTx(t *testing.T) {
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
 
-	provider := transaction.NewSQLProvider(db)
+	provider := stdlibtransaction.NewProvider(db)
 
 	exec := provider.Executor(ctx)
 	_, ok := exec.(*sql.DB)
@@ -39,7 +40,7 @@ func Test_SQLProvider_Begin_BeginTx(t *testing.T) {
 	assertSQLTransactionEnabled(t, provider, tx, "read committed", false)
 }
 
-func assertSQLTransactionEnabled(t *testing.T, provider *transaction.SQLProvider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
+func assertSQLTransactionEnabled(t *testing.T, provider *stdlibtransaction.Provider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
 	enabled := provider.TxEnabled(tx.Context())
 	require.True(t, enabled)
 
@@ -86,7 +87,7 @@ func Test_SQLProvider_Rollback_Commit(t *testing.T) {
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
 
-	provider := transaction.NewSQLProvider(db)
+	provider := stdlibtransaction.NewProvider(db)
 
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)

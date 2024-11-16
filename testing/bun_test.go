@@ -7,6 +7,7 @@ import (
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
 	"github.com/amidgo/transaction"
+	buntransaction "github.com/amidgo/transaction/bun"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -21,7 +22,7 @@ func Test_BunProvider_Begin_BeginTx(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := transaction.NewBunProvider(bunDB)
+	provider := buntransaction.NewProvider(bunDB)
 
 	exec := provider.Executor(ctx)
 	_, ok := exec.(*bun.DB)
@@ -59,7 +60,7 @@ func Test_BunProvider_Rollback_Commit(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := transaction.NewBunProvider(bunDB)
+	provider := buntransaction.NewProvider(bunDB)
 
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)
@@ -84,7 +85,7 @@ func Test_BunProvider_Rollback_Commit(t *testing.T) {
 	assertBunTxRollback(t, provider.Executor(tx.Context()), tx, db)
 }
 
-func assertBunTransactionEnabled(t *testing.T, provider *transaction.BunProvider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
+func assertBunTransactionEnabled(t *testing.T, provider *buntransaction.Provider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
 	enabled := provider.TxEnabled(tx.Context())
 	require.True(t, enabled)
 

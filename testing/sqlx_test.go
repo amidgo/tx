@@ -7,6 +7,7 @@ import (
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
 	"github.com/amidgo/transaction"
+	sqlxtransaction "github.com/amidgo/transaction/sqlx"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func Test_SqlxProvider_Begin_BeginTx(t *testing.T) {
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := transaction.NewSqlxProvider(sqlxDB)
+	provider := sqlxtransaction.NewProvider(sqlxDB)
 
 	tx, err := provider.BeginTx(ctx, sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	require.NoError(t, err)
@@ -37,7 +38,7 @@ func Test_SqlxProvider_Begin_BeginTx(t *testing.T) {
 	assertSqlxTransactionEnabled(t, provider, tx, "read committed", false)
 }
 
-func assertSqlxTransactionEnabled(t *testing.T, provider *transaction.SqlxProvider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
+func assertSqlxTransactionEnabled(t *testing.T, provider *sqlxtransaction.Provider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
 	enabled := provider.TxEnabled(tx.Context())
 	require.True(t, enabled)
 
@@ -70,7 +71,7 @@ func Test_SqlxProvider_Rollback_Commit(t *testing.T) {
 
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := transaction.NewSqlxProvider(sqlxDB)
+	provider := sqlxtransaction.NewProvider(sqlxDB)
 
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)

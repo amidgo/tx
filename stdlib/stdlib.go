@@ -1,12 +1,14 @@
-package transaction
+package stdlibtransaction
 
 import (
 	"context"
 	"database/sql"
 	"sync"
+
+	"github.com/amidgo/transaction"
 )
 
-type sqlTxKey struct{}
+type txKey struct{}
 
 type SQLTransaction struct {
 	tx   *sql.Tx
@@ -31,18 +33,18 @@ func (s *SQLTransaction) Rollback(ctx context.Context) error {
 }
 
 func (s *SQLTransaction) clearTx() {
-	s.once.Do(func() { s.ctx = ClearTx(s.ctx) })
+	s.once.Do(func() { s.ctx = transaction.ClearTx(s.ctx) })
 }
 
-type SQLProvider struct {
+type Provider struct {
 	db *sql.DB
 }
 
-func NewSQLProvider(db *sql.DB) *SQLProvider {
-	return &SQLProvider{db: db}
+func NewProvider(db *sql.DB) *Provider {
+	return &Provider{db: db}
 }
 
-func (s *SQLProvider) Begin(ctx context.Context) (Transaction, error) {
+func (s *Provider) Begin(ctx context.Context) (transaction.Transaction, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -51,7 +53,7 @@ func (s *SQLProvider) Begin(ctx context.Context) (Transaction, error) {
 	return &SQLTransaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
 }
 
-func (s *SQLProvider) BeginTx(ctx context.Context, opts sql.TxOptions) (Transaction, error) {
+func (s *Provider) BeginTx(ctx context.Context, opts sql.TxOptions) (transaction.Transaction, error) {
 	tx, err := s.db.BeginTx(ctx, &opts)
 	if err != nil {
 		return nil, err
@@ -60,28 +62,28 @@ func (s *SQLProvider) BeginTx(ctx context.Context, opts sql.TxOptions) (Transact
 	return &SQLTransaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
 }
 
-func (s *SQLProvider) transactionContext(ctx context.Context, tx *sql.Tx) context.Context {
-	return context.WithValue(StartTx(ctx), sqlTxKey{}, tx)
+func (s *Provider) transactionContext(ctx context.Context, tx *sql.Tx) context.Context {
+	return context.WithValue(transaction.StartTx(ctx), txKey{}, tx)
 }
 
-func (s *SQLProvider) Executor(ctx context.Context) SQLExecutor {
+func (s *Provider) Executor(ctx context.Context) Executor {
 	executor, _ := s.executor(ctx)
 
 	return executor
 }
 
-func (s *SQLProvider) TxEnabled(ctx context.Context) bool {
+func (s *Provider) TxEnabled(ctx context.Context) bool {
 	_, ok := s.executor(ctx)
 
 	return ok
 }
 
-func (s *SQLProvider) executor(ctx context.Context) (SQLExecutor, bool) {
-	if !TxEnabled(ctx) {
+func (s *Provider) executor(ctx context.Context) (Executor, bool) {
+	if !transaction.TxEnabled(ctx) {
 		return s.db, false
 	}
 
-	tx, ok := ctx.Value(sqlTxKey{}).(*sql.Tx)
+	tx, ok := ctx.Value(txKey{}).(*sql.Tx)
 	if !ok {
 		return s.db, false
 	}
@@ -89,7 +91,7 @@ func (s *SQLProvider) executor(ctx context.Context) (SQLExecutor, bool) {
 	return tx, true
 }
 
-type SQLExecutor interface {
+type Executor interface {
 	Exec(query string, args ...any) (sql.Result, error)
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	Query(query string, args ...any) (*sql.Rows, error)

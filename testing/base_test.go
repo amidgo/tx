@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/amidgo/transaction"
+	sqlxtransaction "github.com/amidgo/transaction/sqlx"
+	stdlibtransaction "github.com/amidgo/transaction/stdlib"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
@@ -19,8 +21,8 @@ type executor interface {
 
 var (
 	_ executor = bun.IDB(nil)
-	_ executor = transaction.SQLExecutor(nil)
-	_ executor = transaction.SQLXExecutor(nil)
+	_ executor = stdlibtransaction.Executor(nil)
+	_ executor = sqlxtransaction.Executor(nil)
 )
 
 func assertTxCommit(t *testing.T, exec executor, tx transaction.Transaction, db *sql.DB) {
