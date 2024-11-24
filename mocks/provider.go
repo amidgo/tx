@@ -8,6 +8,8 @@ import (
 	"github.com/amidgo/transaction"
 )
 
+var _ transaction.Provider = &Provider{}
+
 type providerAsserter interface {
 	assert()
 	begin() (transaction.Transaction, error)
