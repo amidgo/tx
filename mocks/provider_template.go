@@ -7,10 +7,10 @@ import (
 	"github.com/amidgo/transaction"
 )
 
-type ProviderTemplate func(t testReporter) transaction.Provider
+type ProviderTemplate func(t testReporter) *Provider
 
 func ExpectBeginAndReturnError(beginError error) ProviderTemplate {
-	return func(t testReporter) transaction.Provider {
+	return func(t testReporter) *Provider {
 		asrt := &beginAndReturnError{
 			t:   t,
 			err: beginError,
@@ -21,7 +21,7 @@ func ExpectBeginAndReturnError(beginError error) ProviderTemplate {
 }
 
 func ExpectBeginTxAndReturnError(beginError error, expectedOpts sql.TxOptions) ProviderTemplate {
-	return func(t testReporter) transaction.Provider {
+	return func(t testReporter) *Provider {
 		asrt := &beginTxAndReturnError{
 			t:            t,
 			err:          beginError,
@@ -33,7 +33,7 @@ func ExpectBeginTxAndReturnError(beginError error, expectedOpts sql.TxOptions) P
 }
 
 func ExpectBeginAndReturnTx(tx TransactionTemplate) ProviderTemplate {
-	return func(t testReporter) transaction.Provider {
+	return func(t testReporter) *Provider {
 		asrt := &beginAndReturnTx{
 			t:  t,
 			tx: tx(t),
@@ -44,7 +44,7 @@ func ExpectBeginAndReturnTx(tx TransactionTemplate) ProviderTemplate {
 }
 
 func ExpectBeginTxAndReturnTx(tx TransactionTemplate, opts sql.TxOptions) ProviderTemplate {
-	return func(t testReporter) transaction.Provider {
+	return func(t testReporter) *Provider {
 		asrt := &beginTxAndReturnTx{
 			t:            t,
 			tx:           tx(t),
@@ -56,7 +56,7 @@ func ExpectBeginTxAndReturnTx(tx TransactionTemplate, opts sql.TxOptions) Provid
 }
 
 func ProviderJoin(tmpls ...ProviderTemplate) ProviderTemplate {
-	return func(t testReporter) transaction.Provider {
+	return func(t testReporter) *Provider {
 		switch len(tmpls) {
 		case 0:
 			t.Fatal("empty join provider templates")
@@ -71,14 +71,7 @@ func ProviderJoin(tmpls ...ProviderTemplate) ProviderTemplate {
 		for i := range tmpls {
 			index := len(tmpls) - 1 - i
 
-			tmpl := tmpls[index]
-
-			prv, ok := tmpl(t).(*Provider)
-			if !ok {
-				t.Fatalf("invalid provider template by index %d, allowed only internal providers", index)
-
-				return nil
-			}
+			prv := tmpls[index](t)
 
 			if prv.asrt == nil {
 				t.Fatalf("invalid provider template by index %d, Provider.asrt is nil", index)

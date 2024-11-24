@@ -18,7 +18,7 @@ type Provider struct {
 	asrt providerAsserter
 }
 
-func newProvider(t testReporter, asrt providerAsserter) transaction.Provider {
+func newProvider(t testReporter, asrt providerAsserter) *Provider {
 	t.Cleanup(asrt.assert)
 
 	return &Provider{asrt: asrt}
