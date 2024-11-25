@@ -2,9 +2,9 @@ package mocks
 
 import "github.com/amidgo/transaction"
 
-type TransactionTemplate func(t testReporter) transaction.Transaction
+type TransactionMock func(t testReporter) transaction.Transaction
 
-func ExpectRollback(err error) TransactionTemplate {
+func ExpectRollback(err error) TransactionMock {
 	return func(t testReporter) transaction.Transaction {
 		asrt := &rollback{
 			err: err,
@@ -15,7 +15,7 @@ func ExpectRollback(err error) TransactionTemplate {
 	}
 }
 
-func ExpectCommit() TransactionTemplate {
+func ExpectCommit() TransactionMock {
 	return func(t testReporter) transaction.Transaction {
 		asrt := &commit{
 			t: t,
@@ -25,7 +25,7 @@ func ExpectCommit() TransactionTemplate {
 	}
 }
 
-func ExpectRollbackAfterFailedCommit(commitError error) TransactionTemplate {
+func ExpectRollbackAfterFailedCommit(commitError error) TransactionMock {
 	return func(t testReporter) transaction.Transaction {
 		asrt := &rollbackAfterFailedCommit{
 			t:   t,
@@ -36,7 +36,7 @@ func ExpectRollbackAfterFailedCommit(commitError error) TransactionTemplate {
 	}
 }
 
-func ExpectNothing() TransactionTemplate {
+func ExpectNothing() TransactionMock {
 	return func(t testReporter) transaction.Transaction {
 		asrt := &nothing{
 			t: t,

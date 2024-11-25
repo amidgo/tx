@@ -273,7 +273,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
 
 type ProviderJoinTest struct {
 	CaseName          string
-	ProviderTemplates []mocks.ProviderTemplate
+	ProviderTemplates []mocks.ProviderMock
 	WithProvider      func(p transaction.Provider)
 	ExpectReport      bool
 }
@@ -306,7 +306,7 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "single operation, valid",
-			ProviderTemplates: []mocks.ProviderTemplate{
+			ProviderTemplates: []mocks.ProviderMock{
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 			},
 			WithProvider: func(p transaction.Provider) {
@@ -318,7 +318,7 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "single operation, not valid",
-			ProviderTemplates: []mocks.ProviderTemplate{
+			ProviderTemplates: []mocks.ProviderMock{
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 			},
 			WithProvider: func(p transaction.Provider) {
@@ -334,7 +334,7 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, valid",
-			ProviderTemplates: []mocks.ProviderTemplate{
+			ProviderTemplates: []mocks.ProviderMock{
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 			},
@@ -351,7 +351,7 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, invalid count times",
-			ProviderTemplates: []mocks.ProviderTemplate{
+			ProviderTemplates: []mocks.ProviderMock{
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 			},
@@ -372,7 +372,7 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, valid order",
-			ProviderTemplates: []mocks.ProviderTemplate{
+			ProviderTemplates: []mocks.ProviderMock{
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 				mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 			},
@@ -389,7 +389,7 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, invalid order",
-			ProviderTemplates: []mocks.ProviderTemplate{
+			ProviderTemplates: []mocks.ProviderMock{
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 				mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 			},
@@ -406,7 +406,7 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "to many operations, with transactions",
-			ProviderTemplates: []mocks.ProviderTemplate{
+			ProviderTemplates: []mocks.ProviderMock{
 				mocks.ExpectBeginAndReturnError(errBeginTx),
 				mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 				mocks.ExpectBeginAndReturnTx(mocks.ExpectCommit()),

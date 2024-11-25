@@ -7,9 +7,9 @@ import (
 	"github.com/amidgo/transaction"
 )
 
-type ProviderTemplate func(t testReporter) *Provider
+type ProviderMock func(t testReporter) *Provider
 
-func ExpectBeginAndReturnError(beginError error) ProviderTemplate {
+func ExpectBeginAndReturnError(beginError error) ProviderMock {
 	return func(t testReporter) *Provider {
 		asrt := &beginAndReturnError{
 			t:   t,
@@ -20,7 +20,7 @@ func ExpectBeginAndReturnError(beginError error) ProviderTemplate {
 	}
 }
 
-func ExpectBeginTxAndReturnError(beginError error, expectedOpts sql.TxOptions) ProviderTemplate {
+func ExpectBeginTxAndReturnError(beginError error, expectedOpts sql.TxOptions) ProviderMock {
 	return func(t testReporter) *Provider {
 		asrt := &beginTxAndReturnError{
 			t:            t,
@@ -32,7 +32,7 @@ func ExpectBeginTxAndReturnError(beginError error, expectedOpts sql.TxOptions) P
 	}
 }
 
-func ExpectBeginAndReturnTx(tx TransactionTemplate) ProviderTemplate {
+func ExpectBeginAndReturnTx(tx TransactionMock) ProviderMock {
 	return func(t testReporter) *Provider {
 		asrt := &beginAndReturnTx{
 			t:  t,
@@ -43,7 +43,7 @@ func ExpectBeginAndReturnTx(tx TransactionTemplate) ProviderTemplate {
 	}
 }
 
-func ExpectBeginTxAndReturnTx(tx TransactionTemplate, opts sql.TxOptions) ProviderTemplate {
+func ExpectBeginTxAndReturnTx(tx TransactionMock, opts sql.TxOptions) ProviderMock {
 	return func(t testReporter) *Provider {
 		asrt := &beginTxAndReturnTx{
 			t:            t,
@@ -55,7 +55,7 @@ func ExpectBeginTxAndReturnTx(tx TransactionTemplate, opts sql.TxOptions) Provid
 	}
 }
 
-func ProviderJoin(tmpls ...ProviderTemplate) ProviderTemplate {
+func ProviderJoin(tmpls ...ProviderMock) ProviderMock {
 	return func(t testReporter) *Provider {
 		switch len(tmpls) {
 		case 0:

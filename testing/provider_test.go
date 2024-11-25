@@ -14,7 +14,7 @@ import (
 
 type WithProviderTest struct {
 	CaseName         string
-	ProviderTemplate mocks.ProviderTemplate
+	ProviderTemplate mocks.ProviderMock
 	WithTx           func(ctx context.Context) error
 	Opts             sql.TxOptions
 	ExpectedError    error
