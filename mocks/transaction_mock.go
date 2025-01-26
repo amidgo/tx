@@ -15,14 +15,12 @@ func ExpectRollback(err error) TransactionMock {
 	}
 }
 
-func ExpectCommit() TransactionMock {
-	return func(t testReporter) transaction.Transaction {
-		asrt := &commit{
-			t: t,
-		}
-
-		return newTransaction(t, asrt)
+func ExpectCommit(t testReporter) transaction.Transaction {
+	asrt := &commit{
+		t: t,
 	}
+
+	return newTransaction(t, asrt)
 }
 
 func ExpectRollbackAfterFailedCommit(commitError error) TransactionMock {
@@ -36,12 +34,10 @@ func ExpectRollbackAfterFailedCommit(commitError error) TransactionMock {
 	}
 }
 
-func ExpectNothing() TransactionMock {
-	return func(t testReporter) transaction.Transaction {
-		asrt := &nothing{
-			t: t,
-		}
-
-		return newTransaction(t, asrt)
+func ExpectNothing(t testReporter) transaction.Transaction {
+	asrt := &nothing{
+		t: t,
 	}
+
+	return newTransaction(t, asrt)
 }

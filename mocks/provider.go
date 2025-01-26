@@ -8,7 +8,7 @@ import (
 	"github.com/amidgo/transaction"
 )
 
-var _ transaction.Provider = &Provider{}
+var _ transaction.Provider = (*Provider)(nil)
 
 type providerAsserter interface {
 	assert()
@@ -82,7 +82,7 @@ func (b *beginTxAndReturnError) beginTx(opts sql.TxOptions) (transaction.Transac
 	}
 
 	if b.expectedOpts != opts {
-		b.t.Fatalf("unexpected call, call provider.BeginTx with %v opts, expected %v", opts, b.expectedOpts)
+		b.t.Fatalf("unexpected call, call provider.BeginTx with %+v opts, expected %+v", opts, b.expectedOpts)
 	}
 
 	return nil, b.err
@@ -143,7 +143,7 @@ func (b *beginTxAndReturnTx) beginTx(opts sql.TxOptions) (transaction.Transactio
 	}
 
 	if b.expectedOpts != opts {
-		b.t.Fatalf("unexpected call, call provider.BeginTx with %v opts, expected %v", opts, b.expectedOpts)
+		b.t.Fatalf("unexpected call, call provider.BeginTx with %+v opts, expected %+v", opts, b.expectedOpts)
 	}
 
 	return b.tx, nil

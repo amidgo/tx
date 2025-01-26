@@ -8,7 +8,7 @@ import (
 
 func requireEqual(t *testing.T, expected, actual any) {
 	if !reflect.DeepEqual(expected, actual) {
-		t.Fatalf("expected %+v not equal %+v", expected, actual)
+		t.Fatalf("\nexpected:\n\t%+v\nactual:\n\t%+v", expected, actual)
 	}
 }
 
