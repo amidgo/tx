@@ -25,7 +25,13 @@ var (
 	_ executor = sqlxtransaction.Executor(nil)
 )
 
-func assertTxCommit(t *testing.T, exec executor, tx transaction.Transaction, db *sql.DB) {
+func assertTxCommit(
+	t *testing.T,
+	provider transaction.Provider,
+	exec executor,
+	tx transaction.Transaction,
+	db *sql.DB,
+) {
 	expectedUserID := uuid.New()
 	expectedUserAge := 10
 
@@ -36,16 +42,22 @@ func assertTxCommit(t *testing.T, exec executor, tx transaction.Transaction, db 
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	err = tx.Commit(tx.Context())
+	err = tx.Commit()
 	require.NoError(t, err)
 
 	assertUserExists(t, db, expectedUserID, expectedUserAge)
 
-	enabled := transaction.TxEnabled(tx.Context())
+	enabled := provider.TxEnabled(tx.Context())
 	require.False(t, enabled)
 }
 
-func assertBunTxCommit(t *testing.T, exec executor, tx transaction.Transaction, db *sql.DB) {
+func assertBunTxCommit(
+	t *testing.T,
+	provider transaction.Provider,
+	exec executor,
+	tx transaction.Transaction,
+	db *sql.DB,
+) {
 	expectedUserID := uuid.New()
 	expectedUserAge := 10
 
@@ -56,16 +68,22 @@ func assertBunTxCommit(t *testing.T, exec executor, tx transaction.Transaction, 
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	err = tx.Commit(tx.Context())
+	err = tx.Commit()
 	require.NoError(t, err)
 
 	assertUserExists(t, db, expectedUserID, expectedUserAge)
 
-	enabled := transaction.TxEnabled(tx.Context())
+	enabled := provider.TxEnabled(tx.Context())
 	require.False(t, enabled)
 }
 
-func assertTxRollback(t *testing.T, exec executor, tx transaction.Transaction, db *sql.DB) {
+func assertTxRollback(
+	t *testing.T,
+	provider transaction.Provider,
+	exec executor,
+	tx transaction.Transaction,
+	db *sql.DB,
+) {
 	expectedUserID := uuid.New()
 	expectedUserAge := 10
 
@@ -76,16 +94,22 @@ func assertTxRollback(t *testing.T, exec executor, tx transaction.Transaction, d
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	err = tx.Rollback(tx.Context())
+	err = tx.Rollback()
 	require.NoError(t, err)
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	enabled := transaction.TxEnabled(tx.Context())
+	enabled := provider.TxEnabled(tx.Context())
 	require.False(t, enabled)
 }
 
-func assertBunTxRollback(t *testing.T, exec executor, tx transaction.Transaction, db *sql.DB) {
+func assertBunTxRollback(
+	t *testing.T,
+	provider transaction.Provider,
+	exec executor,
+	tx transaction.Transaction,
+	db *sql.DB,
+) {
 	expectedUserID := uuid.New()
 	expectedUserAge := 10
 
@@ -96,12 +120,12 @@ func assertBunTxRollback(t *testing.T, exec executor, tx transaction.Transaction
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	err = tx.Rollback(tx.Context())
+	err = tx.Rollback()
 	require.NoError(t, err)
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	enabled := transaction.TxEnabled(tx.Context())
+	enabled := provider.TxEnabled(tx.Context())
 	require.False(t, enabled)
 }
 

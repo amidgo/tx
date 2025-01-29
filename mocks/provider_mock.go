@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"context"
 	"database/sql"
 	"sync"
 
@@ -20,7 +21,7 @@ func ExpectBeginAndReturnError(beginError error) ProviderMock {
 	}
 }
 
-func ExpectBeginTxAndReturnError(beginError error, expectedOpts sql.TxOptions) ProviderMock {
+func ExpectBeginTxAndReturnError(beginError error, expectedOpts *sql.TxOptions) ProviderMock {
 	return func(t testReporter) *Provider {
 		asrt := &beginTxAndReturnError{
 			t:            t,
@@ -43,7 +44,7 @@ func ExpectBeginAndReturnTx(tx TransactionMock) ProviderMock {
 	}
 }
 
-func ExpectBeginTxAndReturnTx(tx TransactionMock, opts sql.TxOptions) ProviderMock {
+func ExpectBeginTxAndReturnTx(tx TransactionMock, opts *sql.TxOptions) ProviderMock {
 	return func(t testReporter) *Provider {
 		asrt := &beginTxAndReturnTx{
 			t:            t,
@@ -98,7 +99,7 @@ type providerAsserterJoin struct {
 	mu           sync.Mutex
 }
 
-func (p *providerAsserterJoin) begin() (transaction.Transaction, error) {
+func (p *providerAsserterJoin) begin(ctx context.Context) (transaction.Transaction, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -109,14 +110,14 @@ func (p *providerAsserterJoin) begin() (transaction.Transaction, error) {
 		return nil, nil
 	}
 
-	tx, err := asrt.begin()
+	tx, err := asrt.begin(ctx)
 
 	p.currentIndex++
 
 	return tx, err
 }
 
-func (p *providerAsserterJoin) beginTx(opts sql.TxOptions) (transaction.Transaction, error) {
+func (p *providerAsserterJoin) beginTx(ctx context.Context, opts *sql.TxOptions) (transaction.Transaction, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -127,7 +128,7 @@ func (p *providerAsserterJoin) beginTx(opts sql.TxOptions) (transaction.Transact
 		return nil, nil
 	}
 
-	tx, err := asrt.beginTx(opts)
+	tx, err := asrt.beginTx(ctx, opts)
 
 	p.currentIndex++
 

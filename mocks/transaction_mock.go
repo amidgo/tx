@@ -1,11 +1,9 @@
 package mocks
 
-import "github.com/amidgo/transaction"
-
-type TransactionMock func(t testReporter) transaction.Transaction
+type TransactionMock func(t testReporter) *Transaction
 
 func ExpectRollback(err error) TransactionMock {
-	return func(t testReporter) transaction.Transaction {
+	return func(t testReporter) *Transaction {
 		asrt := &rollback{
 			err: err,
 			t:   t,
@@ -15,7 +13,7 @@ func ExpectRollback(err error) TransactionMock {
 	}
 }
 
-func ExpectCommit(t testReporter) transaction.Transaction {
+func ExpectCommit(t testReporter) *Transaction {
 	asrt := &commit{
 		t: t,
 	}
@@ -24,7 +22,7 @@ func ExpectCommit(t testReporter) transaction.Transaction {
 }
 
 func ExpectRollbackAfterFailedCommit(commitError error) TransactionMock {
-	return func(t testReporter) transaction.Transaction {
+	return func(t testReporter) *Transaction {
 		asrt := &rollbackAfterFailedCommit{
 			t:   t,
 			err: commitError,
@@ -34,7 +32,7 @@ func ExpectRollbackAfterFailedCommit(commitError error) TransactionMock {
 	}
 }
 
-func ExpectNothing(t testReporter) transaction.Transaction {
+func ExpectNothing(t testReporter) *Transaction {
 	asrt := &nothing{
 		t: t,
 	}

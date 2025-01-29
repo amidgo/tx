@@ -22,12 +22,12 @@ func Test_SqlxProvider_Begin_BeginTx(t *testing.T) {
 
 	provider := sqlxtransaction.NewProvider(sqlxDB)
 
-	tx, err := provider.BeginTx(ctx, sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
+	tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	require.NoError(t, err)
 
 	assertSqlxTransactionEnabled(t, provider, tx, "serializable", false)
 
-	tx, err = provider.BeginTx(ctx, sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	tx, err = provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	require.NoError(t, err)
 
 	assertSqlxTransactionEnabled(t, provider, tx, "repeatable read", true)
@@ -48,7 +48,7 @@ func assertSqlxTransactionEnabled(t *testing.T, provider *sqlxtransaction.Provid
 
 	assertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
 
-	err := tx.Rollback(tx.Context())
+	err := tx.Rollback()
 	require.NoError(t, err)
 
 	enabled = provider.TxEnabled(tx.Context())
@@ -76,22 +76,22 @@ func Test_SqlxProvider_Rollback_Commit(t *testing.T) {
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxCommit(t, provider.Executor(tx.Context()), tx, db)
+	assertTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
 
 	tx, err = provider.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxRollback(t, provider.Executor(tx.Context()), tx, db)
+	assertTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
 
-	opts := sql.TxOptions{Isolation: sql.LevelReadCommitted}
-
-	tx, err = provider.BeginTx(ctx, opts)
-	require.NoError(t, err)
-
-	assertTxCommit(t, provider.Executor(tx.Context()), tx, db)
+	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	tx, err = provider.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertTxRollback(t, provider.Executor(tx.Context()), tx, db)
+	assertTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+
+	tx, err = provider.BeginTx(ctx, opts)
+	require.NoError(t, err)
+
+	assertTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
 }

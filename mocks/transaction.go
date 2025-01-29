@@ -2,10 +2,17 @@ package mocks
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
-
-	"github.com/amidgo/transaction"
 )
+
+type txKey struct{}
+
+type tx struct{}
+
+func startTx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, txKey{}, tx{})
+}
 
 type transactionAsserter interface {
 	rollback() error
@@ -14,25 +21,39 @@ type transactionAsserter interface {
 }
 
 type Transaction struct {
+	once sync.Once
 	asrt transactionAsserter
+	ctx  context.Context
 }
 
 func newTransaction(t testReporter, asrt transactionAsserter) *Transaction {
 	t.Cleanup(asrt.assert)
 
-	return &Transaction{asrt: asrt}
+	ctx := startTx(context.Background())
+
+	return &Transaction{asrt: asrt, ctx: ctx}
 }
 
-func (t *Transaction) Commit(context.Context) error {
+func (t *Transaction) Commit() error {
+	t.clearTx()
+
 	return t.asrt.commit()
 }
 
-func (t *Transaction) Rollback(context.Context) error {
+func (t *Transaction) Rollback() error {
+	t.clearTx()
+
 	return t.asrt.rollback()
 }
 
 func (t *Transaction) Context() context.Context {
-	return transaction.StartTx(context.Background())
+	return t.ctx
+}
+
+func (t *Transaction) clearTx() {
+	t.once.Do(func() {
+		t.ctx = context.WithValue(t.ctx, txKey{}, nil)
+	})
 }
 
 type rollback struct {

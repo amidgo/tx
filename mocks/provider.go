@@ -12,8 +12,8 @@ var _ transaction.Provider = (*Provider)(nil)
 
 type providerAsserter interface {
 	assert()
-	begin() (transaction.Transaction, error)
-	beginTx(sql.TxOptions) (transaction.Transaction, error)
+	begin(ctx context.Context) (transaction.Transaction, error)
+	beginTx(ctx context.Context, opts *sql.TxOptions) (transaction.Transaction, error)
 }
 
 type Provider struct {
@@ -26,12 +26,18 @@ func newProvider(t testReporter, asrt providerAsserter) *Provider {
 	return &Provider{asrt: asrt}
 }
 
-func (p *Provider) Begin(context.Context) (transaction.Transaction, error) {
-	return p.asrt.begin()
+func (p *Provider) Begin(ctx context.Context) (transaction.Transaction, error) {
+	return p.asrt.begin(ctx)
 }
 
-func (p *Provider) BeginTx(_ context.Context, opts sql.TxOptions) (transaction.Transaction, error) {
-	return p.asrt.beginTx(opts)
+func (p *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (transaction.Transaction, error) {
+	return p.asrt.beginTx(ctx, opts)
+}
+
+func (b *Provider) TxEnabled(ctx context.Context) bool {
+	_, ok := ctx.Value(txKey{}).(tx)
+
+	return ok
 }
 
 type beginAndReturnError struct {
@@ -40,7 +46,7 @@ type beginAndReturnError struct {
 	called atomic.Bool
 }
 
-func (b *beginAndReturnError) begin() (transaction.Transaction, error) {
+func (b *beginAndReturnError) begin(context.Context) (transaction.Transaction, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
 		b.t.Fatal("unexpected call, provider.Begin called more than once")
@@ -49,7 +55,7 @@ func (b *beginAndReturnError) begin() (transaction.Transaction, error) {
 	return nil, b.err
 }
 
-func (b *beginAndReturnError) beginTx(sql.TxOptions) (transaction.Transaction, error) {
+func (b *beginAndReturnError) beginTx(context.Context, *sql.TxOptions) (transaction.Transaction, error) {
 	b.t.Fatal("unexpected call to provider.BeginTx, expect one call to provider.Begin")
 
 	return nil, nil
@@ -65,25 +71,23 @@ func (b *beginAndReturnError) assert() {
 type beginTxAndReturnError struct {
 	t            testReporter
 	err          error
-	expectedOpts sql.TxOptions
+	expectedOpts *sql.TxOptions
 	called       atomic.Bool
 }
 
-func (b *beginTxAndReturnError) begin() (transaction.Transaction, error) {
+func (b *beginTxAndReturnError) begin(context.Context) (transaction.Transaction, error) {
 	b.t.Fatal("unexpected call to provider.Begin, expect one call to provider.BeginTx")
 
 	return nil, nil
 }
 
-func (b *beginTxAndReturnError) beginTx(opts sql.TxOptions) (transaction.Transaction, error) {
+func (b *beginTxAndReturnError) beginTx(_ context.Context, opts *sql.TxOptions) (transaction.Transaction, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
 		b.t.Fatal("unexpected call, provider.BeginTx called more than once")
 	}
 
-	if b.expectedOpts != opts {
-		b.t.Fatalf("unexpected call, call provider.BeginTx with %+v opts, expected %+v", opts, b.expectedOpts)
-	}
+	sqlOptsEqual(b.t, b.expectedOpts, opts)
 
 	return nil, b.err
 }
@@ -97,20 +101,22 @@ func (b *beginTxAndReturnError) assert() {
 
 type beginAndReturnTx struct {
 	t      testReporter
-	tx     transaction.Transaction
+	tx     *Transaction
 	called atomic.Bool
 }
 
-func (b *beginAndReturnTx) begin() (transaction.Transaction, error) {
+func (b *beginAndReturnTx) begin(ctx context.Context) (transaction.Transaction, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
 		b.t.Fatal("unexpected call, provider.Begin called more than once")
 	}
 
+	b.tx.ctx = startTx(ctx)
+
 	return b.tx, nil
 }
 
-func (b *beginAndReturnTx) beginTx(sql.TxOptions) (transaction.Transaction, error) {
+func (b *beginAndReturnTx) beginTx(ctx context.Context, opts *sql.TxOptions) (transaction.Transaction, error) {
 	b.t.Fatal("unexpected call to provider.BeginTx, expect one call to provider.Begin")
 
 	return nil, nil
@@ -125,26 +131,26 @@ func (b *beginAndReturnTx) assert() {
 
 type beginTxAndReturnTx struct {
 	t            testReporter
-	tx           transaction.Transaction
-	expectedOpts sql.TxOptions
+	tx           *Transaction
+	expectedOpts *sql.TxOptions
 	called       atomic.Bool
 }
 
-func (b *beginTxAndReturnTx) begin() (transaction.Transaction, error) {
+func (b *beginTxAndReturnTx) begin(context.Context) (transaction.Transaction, error) {
 	b.t.Fatal("unexpected call to provider.Begin, expect one call to provider.BeginTx")
 
 	return nil, nil
 }
 
-func (b *beginTxAndReturnTx) beginTx(opts sql.TxOptions) (transaction.Transaction, error) {
+func (b *beginTxAndReturnTx) beginTx(ctx context.Context, opts *sql.TxOptions) (transaction.Transaction, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
 		b.t.Fatal("unexpected call, provider.BeginTx called more than once")
 	}
 
-	if b.expectedOpts != opts {
-		b.t.Fatalf("unexpected call, call provider.BeginTx with %+v opts, expected %+v", opts, b.expectedOpts)
-	}
+	sqlOptsEqual(b.t, b.expectedOpts, opts)
+
+	b.tx.ctx = startTx(ctx)
 
 	return b.tx, nil
 }
@@ -154,4 +160,29 @@ func (b *beginTxAndReturnTx) assert() {
 	if !called {
 		b.t.Fatal("provider assertion failed, no calls occurred")
 	}
+}
+
+func sqlOptsEqual(t testReporter, expected, actual *sql.TxOptions) {
+	switch expected {
+	case nil:
+		if actual == nil {
+			return
+		}
+
+		tFatalUnexpectedOpts(t, expected, actual)
+	default:
+		if actual == nil {
+			tFatalUnexpectedOpts(t, expected, actual)
+
+			return
+		}
+
+		if *expected != *actual {
+			tFatalUnexpectedOpts(t, expected, actual)
+		}
+	}
+}
+
+func tFatalUnexpectedOpts(t testReporter, expected, actual *sql.TxOptions) {
+	t.Fatalf("unexpected call, call provider.BeginTx with %+v opts, expected %+v", actual, expected)
 }

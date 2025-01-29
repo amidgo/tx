@@ -90,7 +90,7 @@ func Test_Provider_ExpectBeginAndReturnError_CallBeginTx(t *testing.T) {
 
 	provider := mocks.ExpectBeginAndReturnError(beginError)(testReporter)
 
-	tx, err := provider.BeginTx(context.Background(), sql.TxOptions{})
+	tx, err := provider.BeginTx(context.Background(), nil)
 	requireNil(t, tx)
 	requireNoError(t, err)
 }
@@ -99,7 +99,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_Valid(t *testing.T) {
 	testReporter := newMockTestReporter(t, "")
 
 	beginTxError := errors.New("begin tx error")
-	opts := sql.TxOptions{
+	opts := &sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 		ReadOnly:  false,
 	}
@@ -115,7 +115,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledTwice(t *testing.T) {
 	testReporter := newMockTestReporter(t, "unexpected call, provider.BeginTx called more than once")
 
 	beginTxError := errors.New("begin tx error")
-	opts := sql.TxOptions{
+	opts := &sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 		ReadOnly:  false,
 	}
@@ -132,11 +132,11 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledTwice(t *testing.T) {
 
 func Test_Provider_ExpectBeginTxAndReturnError_Call_With_Unexpected_Opts(t *testing.T) {
 	beginTxError := errors.New("begin tx error")
-	expectedOpts := sql.TxOptions{
+	expectedOpts := &sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 		ReadOnly:  false,
 	}
-	callOpts := sql.TxOptions{
+	callOpts := &sql.TxOptions{
 		Isolation: sql.LevelDefault,
 	}
 
@@ -146,7 +146,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_Call_With_Unexpected_Opts(t *test
 
 	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, expectedOpts)(testReporter)
 
-	tx, err := provider.BeginTx(context.Background(), sql.TxOptions{Isolation: sql.LevelDefault})
+	tx, err := provider.BeginTx(context.Background(), callOpts)
 	requireNil(t, tx)
 	requireErrorIs(t, err, beginTxError)
 }
@@ -155,7 +155,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_Expect_But_Not_Called(t *testing.
 	testReporter := newMockTestReporter(t, "provider assertion failed, no calls occurred")
 
 	beginTxError := errors.New("begin tx error")
-	opts := sql.TxOptions{
+	opts := &sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 		ReadOnly:  false,
 	}
@@ -167,7 +167,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledBegin(t *testing.T) {
 	testReporter := newMockTestReporter(t, "unexpected call to provider.Begin, expect one call to provider.BeginTx")
 
 	beginTxError := errors.New("begin tx error")
-	opts := sql.TxOptions{
+	opts := &sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 		ReadOnly:  false,
 	}
@@ -214,7 +214,7 @@ func Test_Provider_ExpectBeginAndReturnTx_CalledBeginTx(t *testing.T) {
 
 	provider := mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
 
-	tx, err := provider.BeginTx(context.Background(), sql.TxOptions{})
+	tx, err := provider.BeginTx(context.Background(), nil)
 	requireNoError(t, err)
 	requireNil(t, tx)
 }
@@ -222,7 +222,7 @@ func Test_Provider_ExpectBeginAndReturnTx_CalledBeginTx(t *testing.T) {
 func Test_Provider_ExpectBeginTxAndReturnTx_Valid(t *testing.T) {
 	testReporter := newMockTestReporter(t, "")
 
-	opts := sql.TxOptions{Isolation: sql.LevelReadCommitted}
+	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
 
@@ -234,7 +234,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Valid(t *testing.T) {
 func Test_Provider_ExpectBeginTxAndReturnTx_CalledTwice(t *testing.T) {
 	testReporter := newMockTestReporter(t, "unexpected call, provider.BeginTx called more than once")
 
-	opts := sql.TxOptions{Isolation: sql.LevelReadCommitted}
+	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
 
@@ -248,11 +248,11 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledTwice(t *testing.T) {
 }
 
 func Test_Provider_ExpectBeginTxAndReturnTx_Call_With_Unexpected_Opts(t *testing.T) {
-	expectedOpts := sql.TxOptions{
+	expectedOpts := &sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 		ReadOnly:  false,
 	}
-	callOpts := sql.TxOptions{
+	callOpts := &sql.TxOptions{
 		Isolation: sql.LevelDefault,
 	}
 
@@ -270,7 +270,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Call_With_Unexpected_Opts(t *testing
 func Test_Provider_ExpectBeginTxAndReturnTx_Expect_But_Not_Called(t *testing.T) {
 	testReporter := newMockTestReporter(t, "provider assertion failed, no calls occurred")
 
-	opts := sql.TxOptions{Isolation: sql.LevelReadCommitted}
+	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
 }
@@ -278,7 +278,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Expect_But_Not_Called(t *testing.T) 
 func Test_Provider_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
 	testReporter := newMockTestReporter(t, "unexpected call to provider.Begin, expect one call to provider.BeginTx")
 
-	opts := sql.TxOptions{Isolation: sql.LevelReadCommitted}
+	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
 
@@ -310,7 +310,7 @@ func (p *ProviderJoinTest) Test(t *testing.T) {
 
 func Test_Provider_Join(t *testing.T) {
 	errBeginTx := errors.New("begin tx")
-	opts := sql.TxOptions{
+	opts := &sql.TxOptions{
 		Isolation: sql.LevelDefault,
 	}
 
@@ -438,14 +438,14 @@ func Test_Provider_Join(t *testing.T) {
 				requireNoError(t, err)
 				requireNotNil(t, tx)
 
-				err = tx.Commit(context.Background())
+				err = tx.Commit()
 				requireNoError(t, err)
 
 				tx, err = p.BeginTx(context.Background(), opts)
 				requireNoError(t, err)
 				requireNotNil(t, tx)
 
-				err = tx.Rollback(context.Background())
+				err = tx.Rollback()
 				requireNoError(t, err)
 			},
 		},

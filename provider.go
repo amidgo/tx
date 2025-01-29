@@ -8,66 +8,48 @@ import (
 
 type Transaction interface {
 	Context() context.Context
-	Commit(ctx context.Context) error
-	Rollback(ctx context.Context) error
+	Commit() error
+	Rollback() error
 }
 
 type Provider interface {
 	Begin(ctx context.Context) (Transaction, error)
-	BeginTx(ctx context.Context, opts sql.TxOptions) (Transaction, error)
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (Transaction, error)
+	TxEnabled(ctx context.Context) bool
 }
 
 func WithProvider(
 	ctx context.Context,
 	provider Provider,
 	withTx func(txContext context.Context) error,
-	opts sql.TxOptions,
+	opts *sql.TxOptions,
 ) error {
 	tx, err := provider.BeginTx(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("begin tx, %w", err)
 	}
 
-	tx = &notRollbackAfterCommit{
-		tx: tx,
-	}
+	committed := false
 
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if committed {
+			return
+		}
+
+		_ = tx.Rollback()
+	}()
 
 	err = withTx(tx.Context())
 	if err != nil {
 		return err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit()
 	if err != nil {
 		return fmt.Errorf("commit tx, %w", err)
 	}
 
+	committed = true
+
 	return nil
-}
-
-type notRollbackAfterCommit struct {
-	tx       Transaction
-	commited bool
-}
-
-func (r *notRollbackAfterCommit) Rollback(ctx context.Context) error {
-	if r.commited {
-		return nil
-	}
-
-	return r.tx.Rollback(ctx)
-}
-
-func (r *notRollbackAfterCommit) Commit(ctx context.Context) error {
-	err := r.tx.Commit(ctx)
-
-	r.commited = (err == nil)
-
-	return err
-}
-
-func (r *notRollbackAfterCommit) Context() context.Context {
-	return r.tx.Context()
 }

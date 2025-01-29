@@ -28,12 +28,12 @@ func Test_BunProvider_Begin_BeginTx(t *testing.T) {
 	_, ok := exec.(*bun.DB)
 	require.True(t, ok)
 
-	tx, err := provider.BeginTx(ctx, sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
+	tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	require.NoError(t, err)
 
 	assertBunTransactionEnabled(t, provider, tx, "serializable", false)
 
-	tx, err = provider.BeginTx(ctx, sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	tx, err = provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	require.NoError(t, err)
 
 	assertBunTransactionEnabled(t, provider, tx, "repeatable read", true)
@@ -65,24 +65,24 @@ func Test_BunProvider_Rollback_Commit(t *testing.T) {
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)
 
-	assertBunTxCommit(t, provider.Executor(tx.Context()), tx, db)
+	assertBunTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
 
 	tx, err = provider.Begin(ctx)
 	require.NoError(t, err)
 
-	assertBunTxRollback(t, provider.Executor(tx.Context()), tx, db)
+	assertBunTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
 
-	opts := sql.TxOptions{Isolation: sql.LevelReadCommitted}
-
-	tx, err = provider.BeginTx(ctx, opts)
-	require.NoError(t, err)
-
-	assertBunTxCommit(t, provider.Executor(tx.Context()), tx, db)
+	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	tx, err = provider.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertBunTxRollback(t, provider.Executor(tx.Context()), tx, db)
+	assertBunTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+
+	tx, err = provider.BeginTx(ctx, opts)
+	require.NoError(t, err)
+
+	assertBunTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
 }
 
 func assertBunTransactionEnabled(t *testing.T, provider *buntransaction.Provider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
@@ -95,7 +95,7 @@ func assertBunTransactionEnabled(t *testing.T, provider *buntransaction.Provider
 
 	assertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
 
-	err := tx.Rollback(tx.Context())
+	err := tx.Rollback()
 	require.NoError(t, err)
 
 	enabled = provider.TxEnabled(tx.Context())

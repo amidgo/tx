@@ -1,16 +1,44 @@
 package mocks_test
 
 import (
-	"context"
 	"testing"
 
-	"github.com/amidgo/transaction"
 	"github.com/amidgo/transaction/mocks"
 )
 
 func Test_ContextMatcher(t *testing.T) {
-	ctx := transaction.StartTx(context.Background())
+	tx := mocks.ExpectNothing(t)
+	ctx := tx.Context()
 
-	requireTrue(t, mocks.TxEnabled.Matches(ctx))
-	requireFalse(t, mocks.TxDisabled.Matches(ctx))
+	enabledMatcher := mocks.TxEnabled()
+	disabledMatcher := mocks.TxDisabled()
+
+	requireTrue(t, enabledMatcher.Matches(ctx))
+	requireFalse(t, disabledMatcher.Matches(ctx))
+}
+
+func Test_Context_Disabled_After_Rollback(t *testing.T) {
+	tx := mocks.ExpectRollback(nil)(t)
+
+	requireTrue(t, mocks.TxEnabled().Matches(tx.Context()))
+	requireFalse(t, mocks.TxDisabled().Matches(tx.Context()))
+
+	err := tx.Rollback()
+	requireNoError(t, err)
+
+	requireFalse(t, mocks.TxEnabled().Matches(tx.Context()))
+	requireTrue(t, mocks.TxDisabled().Matches(tx.Context()))
+}
+
+func Test_Context_Disabled_After_Commit(t *testing.T) {
+	tx := mocks.ExpectCommit(t)
+
+	requireTrue(t, mocks.TxEnabled().Matches(tx.Context()))
+	requireFalse(t, mocks.TxDisabled().Matches(tx.Context()))
+
+	err := tx.Commit()
+	requireNoError(t, err)
+
+	requireFalse(t, mocks.TxEnabled().Matches(tx.Context()))
+	requireTrue(t, mocks.TxDisabled().Matches(tx.Context()))
 }

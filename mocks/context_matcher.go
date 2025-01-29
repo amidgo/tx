@@ -7,22 +7,39 @@ import (
 	"github.com/amidgo/transaction"
 )
 
-const (
-	TxEnabled  TxEnabledContextMatcher = true
-	TxDisabled TxEnabledContextMatcher = false
-)
+type Matcher interface {
+	Matches(x any) bool
+	String() string
+}
 
-type TxEnabledContextMatcher bool
+func TxEnabled() Matcher {
+	return &txMatcher{
+		provider: &Provider{},
+		enabled:  true,
+	}
+}
 
-func (m TxEnabledContextMatcher) Matches(x any) bool {
+func TxDisabled() Matcher {
+	return &txMatcher{
+		provider: &Provider{},
+		enabled:  false,
+	}
+}
+
+type txMatcher struct {
+	provider transaction.Provider
+	enabled  bool
+}
+
+func (t txMatcher) Matches(x any) bool {
 	ctx, ok := x.(context.Context)
 	if !ok {
 		return false
 	}
 
-	return transaction.TxEnabled(ctx) == bool(m)
+	return t.provider.TxEnabled(ctx) == t.enabled
 }
 
-func (m TxEnabledContextMatcher) String() string {
-	return "context should contain txEnabled{} flag that equal " + strconv.FormatBool(bool(m))
+func (t txMatcher) String() string {
+	return "context should contain txEnabled{} flag that equal " + strconv.FormatBool(t.enabled)
 }

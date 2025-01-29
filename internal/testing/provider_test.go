@@ -13,11 +13,11 @@ import (
 )
 
 type WithProviderTest struct {
-	CaseName         string
-	ProviderTemplate mocks.ProviderMock
-	WithTx           func(ctx context.Context) error
-	Opts             sql.TxOptions
-	ExpectedError    error
+	CaseName      string
+	Provider      mocks.ProviderMock
+	WithTx        func(t *testing.T, ctx context.Context) error
+	Opts          *sql.TxOptions
+	ExpectedError error
 }
 
 func (w *WithProviderTest) Name() string {
@@ -25,7 +25,7 @@ func (w *WithProviderTest) Name() string {
 }
 
 func (w *WithProviderTest) Test(t *testing.T) {
-	provider := w.ProviderTemplate(t)
+	provider := w.Provider(t)
 	defer func() {
 		err := recover()
 		if err != nil {
@@ -35,7 +35,9 @@ func (w *WithProviderTest) Test(t *testing.T) {
 
 	withTx := func(context.Context) error { return nil }
 	if w.WithTx != nil {
-		withTx = w.WithTx
+		withTx = func(ctx context.Context) error {
+			return w.WithTx(t, ctx)
+		}
 	}
 
 	err := transaction.WithProvider(
@@ -54,23 +56,23 @@ func Test_WithProvider(t *testing.T) {
 		errCommit  = errors.New("commit")
 	)
 
-	opts := sql.TxOptions{
+	opts := &sql.TxOptions{
 		Isolation: sql.LevelReadCommitted,
 		ReadOnly:  true,
 	}
 
 	tester.RunNamedTesters(t,
 		&WithProviderTest{
-			CaseName:         "failed begin tx",
-			ProviderTemplate: mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
-			Opts:             opts,
-			ExpectedError:    errBeginTx,
+			CaseName:      "failed begin tx",
+			Provider:      mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
+			Opts:          opts,
+			ExpectedError: errBeginTx,
 		},
 		&WithProviderTest{
-			CaseName:         "with tx returned error",
-			ProviderTemplate: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectRollback(nil), opts),
-			WithTx: func(ctx context.Context) error {
-				require.True(t, transaction.TxEnabled(ctx))
+			CaseName: "with tx returned error",
+			Provider: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectRollback(nil), opts),
+			WithTx: func(t *testing.T, ctx context.Context) error {
+				require.True(t, mocks.TxEnabled().Matches(ctx))
 
 				return errWithTx
 			},
@@ -78,10 +80,10 @@ func Test_WithProvider(t *testing.T) {
 			ExpectedError: errWithTx,
 		},
 		&WithProviderTest{
-			CaseName:         "with tx paniced",
-			ProviderTemplate: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectRollback(nil), opts),
-			WithTx: func(ctx context.Context) error {
-				require.True(t, transaction.TxEnabled(ctx))
+			CaseName: "with tx paniced",
+			Provider: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectRollback(nil), opts),
+			WithTx: func(t *testing.T, ctx context.Context) error {
+				require.True(t, mocks.TxEnabled().Matches(ctx))
 
 				panic(errWithTx)
 			},
@@ -90,12 +92,12 @@ func Test_WithProvider(t *testing.T) {
 		},
 		&WithProviderTest{
 			CaseName: "commit returned error",
-			ProviderTemplate: mocks.ExpectBeginTxAndReturnTx(
+			Provider: mocks.ExpectBeginTxAndReturnTx(
 				mocks.ExpectRollbackAfterFailedCommit(errCommit),
 				opts,
 			),
-			WithTx: func(ctx context.Context) error {
-				require.True(t, transaction.TxEnabled(ctx))
+			WithTx: func(t *testing.T, ctx context.Context) error {
+				require.True(t, mocks.TxEnabled().Matches(ctx))
 
 				return nil
 			},
@@ -103,10 +105,10 @@ func Test_WithProvider(t *testing.T) {
 			ExpectedError: errCommit,
 		},
 		&WithProviderTest{
-			CaseName:         "commit success",
-			ProviderTemplate: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectCommit(), opts),
-			WithTx: func(ctx context.Context) error {
-				require.True(t, transaction.TxEnabled(ctx))
+			CaseName: "commit success",
+			Provider: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectCommit, opts),
+			WithTx: func(t *testing.T, ctx context.Context) error {
+				require.True(t, mocks.TxEnabled().Matches(ctx))
 
 				return nil
 			},
