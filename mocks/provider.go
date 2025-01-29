@@ -1,4 +1,4 @@
-package mocks
+package transactionmocks
 
 import (
 	"context"

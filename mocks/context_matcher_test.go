@@ -1,9 +1,9 @@
-package mocks_test
+package transactionmocks_test
 
 import (
 	"testing"
 
-	"github.com/amidgo/transaction/mocks"
+	mocks "github.com/amidgo/transaction/mocks"
 	"github.com/stretchr/testify/require"
 )
 

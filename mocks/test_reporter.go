@@ -1,4 +1,4 @@
-package mocks
+package transactionmocks
 
 type testReporter interface {
 	Fatalf(format string, args ...any)
