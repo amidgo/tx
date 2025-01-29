@@ -11,6 +11,7 @@ import (
 	"github.com/amidgo/tester"
 	"github.com/amidgo/transaction"
 	"github.com/amidgo/transaction/mocks"
+	"github.com/stretchr/testify/require"
 )
 
 type mockTestReporter struct {
@@ -24,7 +25,7 @@ func newMockTestReporter(t *testing.T, tFatalMessage string) *mockTestReporter {
 
 	t.Cleanup(
 		func() {
-			requireEqual(t, tFatalMessage, r.tFatalMessage)
+			require.Equal(t, tFatalMessage, r.tFatalMessage)
 		},
 	)
 
@@ -55,8 +56,8 @@ func Test_Provider_ExpectBeginAndReturnError_Valid(t *testing.T) {
 	provider := mocks.ExpectBeginAndReturnError(beginError)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
-	requireNil(t, tx)
-	requireErrorIs(t, err, beginError)
+	require.Nil(t, tx)
+	require.ErrorIs(t, err, beginError)
 }
 
 func Test_Provider_ExpectBeginAndReturnError_CalledTwice(t *testing.T) {
@@ -67,12 +68,12 @@ func Test_Provider_ExpectBeginAndReturnError_CalledTwice(t *testing.T) {
 	provider := mocks.ExpectBeginAndReturnError(beginError)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
-	requireNil(t, tx)
-	requireErrorIs(t, err, beginError)
+	require.Nil(t, tx)
+	require.ErrorIs(t, err, beginError)
 
 	tx, err = provider.Begin(context.Background())
-	requireNil(t, tx)
-	requireErrorIs(t, err, beginError)
+	require.Nil(t, tx)
+	require.ErrorIs(t, err, beginError)
 }
 
 func Test_Provider_ExpectBeginAndReturnError_Expect_But_Not_Called(t *testing.T) {
@@ -91,8 +92,8 @@ func Test_Provider_ExpectBeginAndReturnError_CallBeginTx(t *testing.T) {
 	provider := mocks.ExpectBeginAndReturnError(beginError)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), nil)
-	requireNil(t, tx)
-	requireNoError(t, err)
+	require.Nil(t, tx)
+	require.NoError(t, err)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnError_Valid(t *testing.T) {
@@ -107,8 +108,8 @@ func Test_Provider_ExpectBeginTxAndReturnError_Valid(t *testing.T) {
 	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), opts)
-	requireNil(t, tx)
-	requireErrorIs(t, err, beginTxError)
+	require.Nil(t, tx)
+	require.ErrorIs(t, err, beginTxError)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnError_CalledTwice(t *testing.T) {
@@ -122,12 +123,12 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledTwice(t *testing.T) {
 
 	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
 	tx, err := provider.BeginTx(context.Background(), opts)
-	requireNil(t, tx)
-	requireErrorIs(t, err, beginTxError)
+	require.Nil(t, tx)
+	require.ErrorIs(t, err, beginTxError)
 
 	tx, err = provider.BeginTx(context.Background(), opts)
-	requireNil(t, tx)
-	requireErrorIs(t, err, beginTxError)
+	require.Nil(t, tx)
+	require.ErrorIs(t, err, beginTxError)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnError_Call_With_Unexpected_Opts(t *testing.T) {
@@ -147,8 +148,8 @@ func Test_Provider_ExpectBeginTxAndReturnError_Call_With_Unexpected_Opts(t *test
 	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, expectedOpts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), callOpts)
-	requireNil(t, tx)
-	requireErrorIs(t, err, beginTxError)
+	require.Nil(t, tx)
+	require.ErrorIs(t, err, beginTxError)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnError_Expect_But_Not_Called(t *testing.T) {
@@ -175,8 +176,8 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledBegin(t *testing.T) {
 	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
-	requireNil(t, tx)
-	requireNoError(t, err)
+	require.Nil(t, tx)
+	require.NoError(t, err)
 }
 
 func Test_Provider_ExpectBeginAndReturnTx_Valid(t *testing.T) {
@@ -185,8 +186,8 @@ func Test_Provider_ExpectBeginAndReturnTx_Valid(t *testing.T) {
 	provider := mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
-	requireNoError(t, err)
-	requireNotNil(t, tx)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
 }
 
 func Test_Provider_ExpectBeginAndReturnTx_CalledTwice(t *testing.T) {
@@ -195,12 +196,12 @@ func Test_Provider_ExpectBeginAndReturnTx_CalledTwice(t *testing.T) {
 	provider := mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
-	requireNoError(t, err)
-	requireNotNil(t, tx)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
 
 	tx, err = provider.Begin(context.Background())
-	requireNoError(t, err)
-	requireNotNil(t, tx)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
 }
 
 func Test_Provider_ExpectBeginAndReturnTx_Expect_But_Not_Called(t *testing.T) {
@@ -215,8 +216,8 @@ func Test_Provider_ExpectBeginAndReturnTx_CalledBeginTx(t *testing.T) {
 	provider := mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), nil)
-	requireNoError(t, err)
-	requireNil(t, tx)
+	require.NoError(t, err)
+	require.Nil(t, tx)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnTx_Valid(t *testing.T) {
@@ -227,8 +228,8 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Valid(t *testing.T) {
 	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), opts)
-	requireNoError(t, err)
-	requireNotNil(t, tx)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnTx_CalledTwice(t *testing.T) {
@@ -239,12 +240,12 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledTwice(t *testing.T) {
 	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), opts)
-	requireNoError(t, err)
-	requireNotNil(t, tx)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
 
 	tx, err = provider.BeginTx(context.Background(), opts)
-	requireNoError(t, err)
-	requireNotNil(t, tx)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnTx_Call_With_Unexpected_Opts(t *testing.T) {
@@ -263,8 +264,8 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Call_With_Unexpected_Opts(t *testing
 	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, expectedOpts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), callOpts)
-	requireNotNil(t, tx)
-	requireNoError(t, err)
+	require.NotNil(t, tx)
+	require.NoError(t, err)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnTx_Expect_But_Not_Called(t *testing.T) {
@@ -283,8 +284,8 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
 	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
-	requireNil(t, tx)
-	requireNoError(t, err)
+	require.Nil(t, tx)
+	require.NoError(t, err)
 }
 
 type ProviderJoinTest struct {
@@ -327,8 +328,8 @@ func Test_Provider_Join(t *testing.T) {
 			},
 			WithProvider: func(t *testing.T, p transaction.Provider) {
 				tx, err := p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 			},
 		},
 		&ProviderJoinTest{
@@ -338,12 +339,12 @@ func Test_Provider_Join(t *testing.T) {
 			},
 			WithProvider: func(t *testing.T, p transaction.Provider) {
 				tx, err := p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 
 				tx, err = p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 			},
 			TFatalMessage: "unexpected call, provider.Begin called more than once",
 		},
@@ -355,12 +356,12 @@ func Test_Provider_Join(t *testing.T) {
 			},
 			WithProvider: func(t *testing.T, p transaction.Provider) {
 				tx, err := p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 
 				tx, err = p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 			},
 		},
 		&ProviderJoinTest{
@@ -371,16 +372,16 @@ func Test_Provider_Join(t *testing.T) {
 			},
 			WithProvider: func(t *testing.T, p transaction.Provider) {
 				tx, err := p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 
 				tx, err = p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 
 				tx, err = p.Begin(context.Background())
-				requireNoError(t, err)
-				requireNil(t, tx)
+				require.NoError(t, err)
+				require.Nil(t, tx)
 			},
 			TFatalMessage: "unexpected call to provider.Begin, no calls left",
 		},
@@ -392,12 +393,12 @@ func Test_Provider_Join(t *testing.T) {
 			},
 			WithProvider: func(t *testing.T, p transaction.Provider) {
 				tx, err := p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 
 				tx, err = p.BeginTx(context.Background(), opts)
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 			},
 		},
 		&ProviderJoinTest{
@@ -408,12 +409,12 @@ func Test_Provider_Join(t *testing.T) {
 			},
 			WithProvider: func(t *testing.T, p transaction.Provider) {
 				tx, err := p.BeginTx(context.Background(), opts)
-				requireNil(t, err)
-				requireNil(t, tx)
+				require.Nil(t, err)
+				require.Nil(t, tx)
 
 				tx, err = p.Begin(context.Background())
-				requireNil(t, err)
-				requireNil(t, tx)
+				require.Nil(t, err)
+				require.Nil(t, tx)
 			},
 			TFatalMessage: "unexpected call to provider.BeginTx, expect one call to provider.Begin",
 		},
@@ -427,26 +428,26 @@ func Test_Provider_Join(t *testing.T) {
 			},
 			WithProvider: func(t *testing.T, p transaction.Provider) {
 				tx, err := p.Begin(context.Background())
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 
 				tx, err = p.BeginTx(context.Background(), opts)
-				requireErrorIs(t, err, errBeginTx)
-				requireNil(t, tx)
+				require.ErrorIs(t, err, errBeginTx)
+				require.Nil(t, tx)
 
 				tx, err = p.Begin(context.Background())
-				requireNoError(t, err)
-				requireNotNil(t, tx)
+				require.NoError(t, err)
+				require.NotNil(t, tx)
 
 				err = tx.Commit()
-				requireNoError(t, err)
+				require.NoError(t, err)
 
 				tx, err = p.BeginTx(context.Background(), opts)
-				requireNoError(t, err)
-				requireNotNil(t, tx)
+				require.NoError(t, err)
+				require.NotNil(t, tx)
 
 				err = tx.Rollback()
-				requireNoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 	)
