@@ -1,4 +1,4 @@
-package mocks
+package transactionmocks
 
 type TransactionMock func(t testReporter) *Transaction
 
