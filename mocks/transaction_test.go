@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	mocks "github.com/amidgo/transaction/mocks"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Transaction_Context(t *testing.T) {
@@ -15,8 +14,8 @@ func Test_Transaction_Context(t *testing.T) {
 
 	ctx := tx.Context()
 
-	require.True(t, mocks.TxEnabled().Matches(ctx))
-	require.False(t, mocks.TxDisabled().Matches(ctx))
+	requireTrue(t, mocks.TxEnabled().Matches(ctx))
+	requireFalse(t, mocks.TxDisabled().Matches(ctx))
 }
 
 func Test_Transaction_Commit_Valid(t *testing.T) {
@@ -25,7 +24,7 @@ func Test_Transaction_Commit_Valid(t *testing.T) {
 	tx := mocks.ExpectCommit(testReporter)
 
 	err := tx.Commit()
-	require.NoError(t, err)
+	requireNoError(t, err)
 }
 
 func Test_Transaction_Commit_CalledTwice(t *testing.T) {
@@ -34,10 +33,10 @@ func Test_Transaction_Commit_CalledTwice(t *testing.T) {
 	tx := mocks.ExpectCommit(testReporter)
 
 	err := tx.Commit()
-	require.NoError(t, err)
+	requireNoError(t, err)
 
 	err = tx.Commit()
-	require.NoError(t, err)
+	requireNoError(t, err)
 }
 
 func Test_Transaction_Commit_CalledRollback(t *testing.T) {
@@ -62,7 +61,7 @@ func Test_Transaction_ExpectRollback_Valid(t *testing.T) {
 	tx := mocks.ExpectRollback(errRollback)(testReporter)
 
 	err := tx.Rollback()
-	require.ErrorIs(t, err, errRollback)
+	requireErrorIs(t, err, errRollback)
 }
 
 func Test_Transaction_ExpectRollback_CalledTwice(t *testing.T) {
@@ -73,10 +72,10 @@ func Test_Transaction_ExpectRollback_CalledTwice(t *testing.T) {
 	tx := mocks.ExpectRollback(errRollback)(testReporter)
 
 	err := tx.Rollback()
-	require.ErrorIs(t, err, errRollback)
+	requireErrorIs(t, err, errRollback)
 
 	err = tx.Rollback()
-	require.ErrorIs(t, err, errRollback)
+	requireErrorIs(t, err, errRollback)
 }
 
 func Test_Transaction_ExpectRollback_CalledCommit(t *testing.T) {
@@ -87,7 +86,7 @@ func Test_Transaction_ExpectRollback_CalledCommit(t *testing.T) {
 	tx := mocks.ExpectRollback(errRollback)(testReporter)
 
 	err := tx.Commit()
-	require.NoError(t, err)
+	requireNoError(t, err)
 }
 
 func Test_Transaction_ExpectRollback_Expected_But_Not_Called(t *testing.T) {
@@ -106,10 +105,10 @@ func Test_Transaction_ExpectRollbackAfterFailedCommit_Valid(t *testing.T) {
 	tx := mocks.ExpectRollbackAfterFailedCommit(errCommit)(testReporter)
 
 	err := tx.Commit()
-	require.ErrorIs(t, err, errCommit)
+	requireErrorIs(t, err, errCommit)
 
 	err = tx.Rollback()
-	require.NoError(t, err)
+	requireNoError(t, err)
 }
 
 func Test_Transaction_ExpectRollbackAfterFailedCommit_RollbackFirst(t *testing.T) {
@@ -120,10 +119,10 @@ func Test_Transaction_ExpectRollbackAfterFailedCommit_RollbackFirst(t *testing.T
 	tx := mocks.ExpectRollbackAfterFailedCommit(errCommit)(testReporter)
 
 	err := tx.Rollback()
-	require.NoError(t, err)
+	requireNoError(t, err)
 
 	err = tx.Commit()
-	require.ErrorIs(t, err, errCommit)
+	requireErrorIs(t, err, errCommit)
 }
 
 func Test_Transaction_ExpectRollbackAfterFailedCommit_OnlyCommit(t *testing.T) {
@@ -134,7 +133,7 @@ func Test_Transaction_ExpectRollbackAfterFailedCommit_OnlyCommit(t *testing.T) {
 	tx := mocks.ExpectRollbackAfterFailedCommit(errCommit)(testReporter)
 
 	err := tx.Commit()
-	require.ErrorIs(t, err, errCommit)
+	requireErrorIs(t, err, errCommit)
 }
 
 func Test_Transaction_ExpectRollbackAfterFailedCommit_CommitCalledTwice(t *testing.T) {
@@ -145,10 +144,10 @@ func Test_Transaction_ExpectRollbackAfterFailedCommit_CommitCalledTwice(t *testi
 	tx := mocks.ExpectRollbackAfterFailedCommit(errCommit)(testReporter)
 
 	err := tx.Commit()
-	require.ErrorIs(t, err, errCommit)
+	requireErrorIs(t, err, errCommit)
 
 	err = tx.Commit()
-	require.ErrorIs(t, err, errCommit)
+	requireErrorIs(t, err, errCommit)
 
 	tx.Rollback()
 }
@@ -161,7 +160,7 @@ func Test_Transaction_ExpectRollbackAfterFailedCommit_RollbackCalledTwice(t *tes
 	tx := mocks.ExpectRollbackAfterFailedCommit(errCommit)(testReporter)
 
 	err := tx.Commit()
-	require.ErrorIs(t, err, errCommit)
+	requireErrorIs(t, err, errCommit)
 
 	tx.Rollback()
 	tx.Rollback()

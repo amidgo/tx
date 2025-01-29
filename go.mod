@@ -4,7 +4,6 @@ go 1.22
 
 require (
 	github.com/amidgo/containers v0.0.1
-	github.com/amidgo/tester v0.0.6
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/stretchr/testify v1.9.0

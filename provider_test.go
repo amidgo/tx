@@ -6,10 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/amidgo/tester"
 	"github.com/amidgo/transaction"
 	mocks "github.com/amidgo/transaction/mocks"
-	"github.com/stretchr/testify/require"
 )
 
 type WithProviderTest struct {
@@ -28,8 +26,16 @@ func (w *WithProviderTest) Test(t *testing.T) {
 	provider := w.Provider(t)
 	defer func() {
 		err := recover()
-		if err != nil {
-			require.ErrorIs(t, w.ExpectedError, err.(error))
+		if err == nil {
+			return
+		}
+
+		if !errors.Is(err.(error), w.ExpectedError) {
+			t.Fatalf(
+				"unexpected error from panic recover, expected %+v, actual %+v",
+				w.ExpectedError,
+				err,
+			)
 		}
 	}()
 
@@ -46,7 +52,19 @@ func (w *WithProviderTest) Test(t *testing.T) {
 		withTx,
 		w.Opts,
 	)
-	require.ErrorIs(t, err, w.ExpectedError)
+	if !errors.Is(err, w.ExpectedError) {
+		t.Fatalf(
+			"unexpected error from transaction.WithProvider, expected %+v, actual %+v",
+			w.ExpectedError,
+			err,
+		)
+	}
+}
+
+func runWithProviderTests(t *testing.T, tests ...*WithProviderTest) {
+	for _, tst := range tests {
+		t.Run(tst.Name(), tst.Test)
+	}
 }
 
 func Test_WithProvider(t *testing.T) {
@@ -61,7 +79,7 @@ func Test_WithProvider(t *testing.T) {
 		ReadOnly:  true,
 	}
 
-	tester.RunNamedTesters(t,
+	runWithProviderTests(t,
 		&WithProviderTest{
 			CaseName:      "failed begin tx",
 			Provider:      mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
@@ -72,7 +90,7 @@ func Test_WithProvider(t *testing.T) {
 			CaseName: "with tx returned error",
 			Provider: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectRollback(nil), opts),
 			WithTx: func(t *testing.T, ctx context.Context) error {
-				require.True(t, mocks.TxEnabled().Matches(ctx))
+				checkTxEnabled(t, ctx)
 
 				return errWithTx
 			},
@@ -83,7 +101,7 @@ func Test_WithProvider(t *testing.T) {
 			CaseName: "with tx paniced",
 			Provider: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectRollback(nil), opts),
 			WithTx: func(t *testing.T, ctx context.Context) error {
-				require.True(t, mocks.TxEnabled().Matches(ctx))
+				checkTxEnabled(t, ctx)
 
 				panic(errWithTx)
 			},
@@ -97,7 +115,7 @@ func Test_WithProvider(t *testing.T) {
 				opts,
 			),
 			WithTx: func(t *testing.T, ctx context.Context) error {
-				require.True(t, mocks.TxEnabled().Matches(ctx))
+				checkTxEnabled(t, ctx)
 
 				return nil
 			},
@@ -108,7 +126,7 @@ func Test_WithProvider(t *testing.T) {
 			CaseName: "commit success",
 			Provider: mocks.ExpectBeginTxAndReturnTx(mocks.ExpectCommit, opts),
 			WithTx: func(t *testing.T, ctx context.Context) error {
-				require.True(t, mocks.TxEnabled().Matches(ctx))
+				checkTxEnabled(t, ctx)
 
 				return nil
 			},
@@ -116,4 +134,14 @@ func Test_WithProvider(t *testing.T) {
 			ExpectedError: nil,
 		},
 	)
+}
+
+func checkTxEnabled(t *testing.T, ctx context.Context) {
+	if !mocks.TxEnabled().Matches(ctx) {
+		t.Fatalf("check tx fail, mocks.TxEnabled not matches ctx, %s", mocks.TxEnabled().String())
+	}
+
+	if mocks.TxDisabled().Matches(ctx) {
+		t.Fatal("check tx fail, mocks.TxDisabled matches ctx")
+	}
 }
