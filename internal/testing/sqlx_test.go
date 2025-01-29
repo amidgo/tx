@@ -3,11 +3,13 @@ package transaction_test
 import (
 	context "context"
 	sql "database/sql"
+	"errors"
 	"testing"
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
 	"github.com/amidgo/transaction"
 	sqlxtransaction "github.com/amidgo/transaction/sqlx"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
@@ -94,4 +96,130 @@ func Test_SqlxProvider_Rollback_Commit(t *testing.T) {
 	require.NoError(t, err)
 
 	assertTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
+}
+
+func Test_SqlxProvider_WithTx(t *testing.T) {
+	t.Parallel()
+
+	const createUsersTableQuery = `
+		CREATE TABLE users (
+			id uuid primary key,
+			age smallint not null
+		)
+	`
+
+	errStub := errors.New("stub err")
+
+	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
+
+	sqlxDB := sqlx.NewDb(db, "pgx")
+
+	provider := sqlxtransaction.NewProvider(sqlxDB)
+
+	t.Run("no external tx, execution failed, rollback expected", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+
+		userID := uuid.New()
+
+		err := provider.WithTx(ctx,
+			func(ctx context.Context, exec sqlxtransaction.Executor) error {
+				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, 100)
+				require.NoError(t, err)
+
+				return errStub
+			},
+			&sql.TxOptions{
+				Isolation: sql.LevelReadCommitted,
+			},
+		)
+		require.ErrorIs(t, err, errStub)
+
+		assertUserNotFound(t, db, userID)
+	})
+
+	t.Run("no external tx, execution success, commit expected", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+
+		userID := uuid.New()
+		userAge := 100
+
+		err := provider.WithTx(ctx,
+			func(ctx context.Context, exec sqlxtransaction.Executor) error {
+				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
+				require.NoError(t, err)
+
+				return nil
+			},
+			&sql.TxOptions{
+				Isolation: sql.LevelReadCommitted,
+			},
+		)
+		require.NoError(t, err)
+
+		assertUserExists(t, db, userID, userAge)
+	})
+
+	t.Run("external tx, success execution", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+
+		userID := uuid.New()
+		userAge := 100
+
+		tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelDefault})
+		require.NoError(t, err)
+
+		err = provider.WithTx(tx.Context(),
+			func(ctx context.Context, exec sqlxtransaction.Executor) error {
+				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
+				require.NoError(t, err)
+
+				return nil
+			},
+			&sql.TxOptions{
+				Isolation: sql.LevelReadCommitted,
+			},
+		)
+		require.NoError(t, err)
+
+		assertUserNotFound(t, db, userID)
+
+		err = tx.Commit()
+		require.NoError(t, err)
+
+		assertUserExists(t, db, userID, userAge)
+	})
+
+	t.Run("external tx, execution failed", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+
+		userID := uuid.New()
+		userAge := 100
+
+		tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelDefault})
+		require.NoError(t, err)
+
+		err = provider.WithTx(tx.Context(),
+			func(ctx context.Context, exec sqlxtransaction.Executor) error {
+				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
+				require.NoError(t, err)
+
+				return errStub
+			},
+			&sql.TxOptions{
+				Isolation: sql.LevelReadCommitted,
+			},
+		)
+		require.ErrorIs(t, err, errStub)
+
+		assertUserNotFound(t, db, userID)
+
+		err = tx.Commit()
+		require.NoError(t, err)
+
+		assertUserExists(t, db, userID, userAge)
+	})
 }
