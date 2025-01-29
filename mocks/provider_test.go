@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/amidgo/tester"
 	"github.com/amidgo/transaction"
 	mocks "github.com/amidgo/transaction/mocks"
 	"github.com/stretchr/testify/require"
@@ -309,13 +308,19 @@ func (p *ProviderJoinTest) Test(t *testing.T) {
 	}
 }
 
+func runProviderJoinTests(t *testing.T, tests ...*ProviderJoinTest) {
+	for _, tst := range tests {
+		t.Run(tst.Name(), tst.Test)
+	}
+}
+
 func Test_Provider_Join(t *testing.T) {
 	errBeginTx := errors.New("begin tx")
 	opts := &sql.TxOptions{
 		Isolation: sql.LevelDefault,
 	}
 
-	tester.RunNamedTesters(t,
+	runProviderJoinTests(t,
 		&ProviderJoinTest{
 			CaseName:          "zero operations",
 			ProviderTemplates: nil,
