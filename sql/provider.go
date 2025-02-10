@@ -1,40 +1,41 @@
-package stdlibtransaction
+package sqltx
 
 import (
 	"context"
 	"database/sql"
 	"sync"
 
-	ttn "github.com/amidgo/transaction"
+	ttn "github.com/amidgo/tx"
 )
 
 type txKey struct{}
 
-var _ ttn.Transaction = (*transaction)(nil)
+var _ ttn.Tx = (*tx)(nil)
 
-type transaction struct {
-	tx   *sql.Tx
+type tx struct {
+	sqlTx *sql.Tx
+
 	ctx  context.Context
 	once sync.Once
 }
 
-func (s *transaction) Context() context.Context {
+func (s *tx) Context() context.Context {
 	return s.ctx
 }
 
-func (s *transaction) Commit() error {
+func (s *tx) Commit() error {
 	s.clearTx()
 
-	return s.tx.Commit()
+	return s.sqlTx.Commit()
 }
 
-func (s *transaction) Rollback() error {
+func (s *tx) Rollback() error {
 	s.clearTx()
 
-	return s.tx.Rollback()
+	return s.sqlTx.Rollback()
 }
 
-func (s *transaction) clearTx() {
+func (s *tx) clearTx() {
 	s.once.Do(func() {
 		s.ctx = context.WithValue(s.ctx, txKey{}, nil)
 	})
@@ -48,26 +49,32 @@ func NewProvider(db *sql.DB) *Provider {
 	return &Provider{db: db}
 }
 
-func (s *Provider) Begin(ctx context.Context) (ttn.Transaction, error) {
-	tx, err := s.db.Begin()
+func (s *Provider) Begin(ctx context.Context) (ttn.Tx, error) {
+	sqlTx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
 
-	return &transaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
+	return &tx{
+		sqlTx: sqlTx,
+		ctx:   s.txContext(ctx, sqlTx),
+	}, nil
 }
 
-func (s *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Transaction, error) {
-	tx, err := s.db.BeginTx(ctx, opts)
+func (s *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Tx, error) {
+	sqlTx, err := s.db.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return &transaction{tx: tx, ctx: s.transactionContext(ctx, tx)}, nil
+	return &tx{
+		sqlTx: sqlTx,
+		ctx:   s.txContext(ctx, sqlTx),
+	}, nil
 }
 
-func (s *Provider) transactionContext(ctx context.Context, tx *sql.Tx) context.Context {
-	return context.WithValue(ctx, txKey{}, tx)
+func (s *Provider) txContext(ctx context.Context, sqlTx *sql.Tx) context.Context {
+	return context.WithValue(ctx, txKey{}, sqlTx)
 }
 
 func (s *Provider) Executor(ctx context.Context) Executor {
@@ -91,19 +98,20 @@ func (s *Provider) executor(ctx context.Context) (Executor, bool) {
 	return tx, true
 }
 
-func (s *Provider) WithTx(ctx context.Context, f func(ctx context.Context, exec Executor) error, opts *sql.TxOptions) error {
-	exec, enabled := s.executor(ctx)
-	if enabled {
-		return f(ctx, exec)
-	}
-
-	return ttn.WithProvider(ctx, s,
+func (s *Provider) WithTx(
+	ctx context.Context,
+	withTx func(ctx context.Context, exec Executor) error,
+	txOpts *sql.TxOptions,
+	opts ...ttn.Option,
+) error {
+	return ttn.WithTx(ctx, s,
 		func(txContext context.Context) error {
 			exec := s.Executor(txContext)
 
-			return f(txContext, exec)
+			return withTx(txContext, exec)
 		},
-		opts,
+		txOpts,
+		opts...,
 	)
 }
 

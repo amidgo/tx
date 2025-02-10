@@ -1,4 +1,4 @@
-package transactionmocks
+package txmocks
 
 import (
 	"context"
@@ -8,52 +8,65 @@ import (
 
 type txKey struct{}
 
-type tx struct{}
+type mockTx struct{}
 
 func startTx(ctx context.Context) context.Context {
-	return context.WithValue(ctx, txKey{}, tx{})
+	return context.WithValue(ctx, txKey{}, mockTx{})
 }
 
-type transactionAsserter interface {
+type txAsserter interface {
 	rollback() error
 	commit() error
 	assert()
 }
 
-type Transaction struct {
+type Tx struct {
 	once sync.Once
-	asrt transactionAsserter
+	asrt txAsserter
 	ctx  context.Context
 }
 
-func newTransaction(t testReporter, asrt transactionAsserter) *Transaction {
+func newTransaction(t testReporter, asrt txAsserter) *Tx {
 	t.Cleanup(asrt.assert)
 
 	ctx := startTx(context.Background())
 
-	return &Transaction{asrt: asrt, ctx: ctx}
+	return &Tx{asrt: asrt, ctx: ctx}
 }
 
-func (t *Transaction) Commit() error {
+func (t *Tx) Commit() error {
 	t.clearTx()
 
 	return t.asrt.commit()
 }
 
-func (t *Transaction) Rollback() error {
+func (t *Tx) Rollback() error {
 	t.clearTx()
 
 	return t.asrt.rollback()
 }
 
-func (t *Transaction) Context() context.Context {
+func (t *Tx) Context() context.Context {
 	return t.ctx
 }
 
-func (t *Transaction) clearTx() {
+func (t *Tx) clearTx() {
 	t.once.Do(func() {
 		t.ctx = context.WithValue(t.ctx, txKey{}, nil)
 	})
+}
+
+type TxMock func(t testReporter) *Tx
+
+func ExpectRollback(err error) TxMock {
+	return func(t testReporter) *Tx {
+		asrt := &rollback{
+			err: err,
+			t:   t,
+		}
+
+		return newTransaction(t, asrt)
+	}
 }
 
 type rollback struct {
@@ -84,6 +97,14 @@ func (r *rollback) assert() {
 	}
 }
 
+func ExpectCommit(t testReporter) *Tx {
+	asrt := &commit{
+		t: t,
+	}
+
+	return newTransaction(t, asrt)
+}
+
 type commit struct {
 	t      testReporter
 	called atomic.Bool
@@ -103,10 +124,22 @@ func (c *commit) commit() error {
 
 	return nil
 }
+
 func (c *commit) assert() {
 	called := c.called.Load()
 	if !called {
 		c.t.Fatal("tx assertion failed, no calls occurred")
+	}
+}
+
+func ExpectRollbackAfterFailedCommit(commitError error) TxMock {
+	return func(t testReporter) *Tx {
+		asrt := &rollbackAfterFailedCommit{
+			t:         t,
+			commitErr: commitError,
+		}
+
+		return newTransaction(t, asrt)
 	}
 }
 
@@ -117,9 +150,10 @@ const (
 )
 
 type rollbackAfterFailedCommit struct {
-	t     testReporter
-	state atomic.Int32
-	err   error
+	t           testReporter
+	state       atomic.Int32
+	commitErr   error
+	rollbackErr error
 }
 
 func (t *rollbackAfterFailedCommit) rollback() error {
@@ -137,7 +171,7 @@ func (t *rollbackAfterFailedCommit) commit() error {
 		t.t.Fatal("unexpected call, tx.Commit has already was called, expect call tx.Rollback")
 	}
 
-	return t.err
+	return t.commitErr
 }
 
 func (t *rollbackAfterFailedCommit) assert() {
@@ -149,6 +183,14 @@ func (t *rollbackAfterFailedCommit) assert() {
 		t.t.Fatal("tx assertion failed, tx.Rollback not called")
 	case rollbacked:
 	}
+}
+
+func NilTx(t testReporter) *Tx {
+	asrt := &nothing{
+		t: t,
+	}
+
+	return newTransaction(t, asrt)
 }
 
 type nothing struct {

@@ -1,4 +1,4 @@
-package transactionmocks_test
+package txmocks_test
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/amidgo/transaction"
-	mocks "github.com/amidgo/transaction/mocks"
+	"github.com/amidgo/tx"
+	txmocks "github.com/amidgo/tx/mocks"
 )
 
 type mockTestReporter struct {
@@ -51,7 +51,7 @@ func Test_Provider_ExpectBeginAndReturnError_Valid(t *testing.T) {
 
 	beginError := errors.New("begin error")
 
-	provider := mocks.ExpectBeginAndReturnError(beginError)(testReporter)
+	provider := txmocks.ExpectBeginAndReturnError(beginError)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
 	requireNil(t, tx)
@@ -63,7 +63,7 @@ func Test_Provider_ExpectBeginAndReturnError_CalledTwice(t *testing.T) {
 
 	beginError := errors.New("begin error")
 
-	provider := mocks.ExpectBeginAndReturnError(beginError)(testReporter)
+	provider := txmocks.ExpectBeginAndReturnError(beginError)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
 	requireNil(t, tx)
@@ -79,7 +79,7 @@ func Test_Provider_ExpectBeginAndReturnError_Expect_But_Not_Called(t *testing.T)
 
 	beginError := errors.New("begin error")
 
-	mocks.ExpectBeginAndReturnError(beginError)(testReporter)
+	txmocks.ExpectBeginAndReturnError(beginError)(testReporter)
 }
 
 func Test_Provider_ExpectBeginAndReturnError_CallBeginTx(t *testing.T) {
@@ -87,7 +87,7 @@ func Test_Provider_ExpectBeginAndReturnError_CallBeginTx(t *testing.T) {
 
 	beginError := errors.New("begin error")
 
-	provider := mocks.ExpectBeginAndReturnError(beginError)(testReporter)
+	provider := txmocks.ExpectBeginAndReturnError(beginError)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), nil)
 	requireNil(t, tx)
@@ -103,7 +103,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_Valid(t *testing.T) {
 		ReadOnly:  false,
 	}
 
-	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), opts)
 	requireNil(t, tx)
@@ -119,7 +119,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledTwice(t *testing.T) {
 		ReadOnly:  false,
 	}
 
-	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
 	tx, err := provider.BeginTx(context.Background(), opts)
 	requireNil(t, tx)
 	requireErrorIs(t, err, beginTxError)
@@ -143,7 +143,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_Call_With_Unexpected_Opts(t *test
 
 	testReporter := newMockTestReporter(t, tFatalfMessage)
 
-	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, expectedOpts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnError(beginTxError, expectedOpts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), callOpts)
 	requireNil(t, tx)
@@ -159,7 +159,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_Expect_But_Not_Called(t *testing.
 		ReadOnly:  false,
 	}
 
-	mocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
+	txmocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnError_CalledBegin(t *testing.T) {
@@ -171,7 +171,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledBegin(t *testing.T) {
 		ReadOnly:  false,
 	}
 
-	provider := mocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnError(beginTxError, opts)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
 	requireNil(t, tx)
@@ -181,7 +181,7 @@ func Test_Provider_ExpectBeginTxAndReturnError_CalledBegin(t *testing.T) {
 func Test_Provider_ExpectBeginAndReturnTx_Valid(t *testing.T) {
 	testReporter := newMockTestReporter(t, "")
 
-	provider := mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
+	provider := txmocks.ExpectBeginAndReturnTx(txmocks.NilTx)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
 	requireNoError(t, err)
@@ -191,7 +191,7 @@ func Test_Provider_ExpectBeginAndReturnTx_Valid(t *testing.T) {
 func Test_Provider_ExpectBeginAndReturnTx_CalledTwice(t *testing.T) {
 	testReporter := newMockTestReporter(t, "unexpected call, provider.Begin called more than once")
 
-	provider := mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
+	provider := txmocks.ExpectBeginAndReturnTx(txmocks.NilTx)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
 	requireNoError(t, err)
@@ -205,13 +205,13 @@ func Test_Provider_ExpectBeginAndReturnTx_CalledTwice(t *testing.T) {
 func Test_Provider_ExpectBeginAndReturnTx_Expect_But_Not_Called(t *testing.T) {
 	testReporter := newMockTestReporter(t, "provider assertion failed, no calls occurred")
 
-	mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
+	txmocks.ExpectBeginAndReturnTx(txmocks.NilTx)(testReporter)
 }
 
 func Test_Provider_ExpectBeginAndReturnTx_CalledBeginTx(t *testing.T) {
 	testReporter := newMockTestReporter(t, "unexpected call to provider.BeginTx, expect one call to provider.Begin")
 
-	provider := mocks.ExpectBeginAndReturnTx(mocks.ExpectNothing)(testReporter)
+	provider := txmocks.ExpectBeginAndReturnTx(txmocks.NilTx)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), nil)
 	requireNoError(t, err)
@@ -223,7 +223,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Valid(t *testing.T) {
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
-	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnTx(txmocks.NilTx, opts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), opts)
 	requireNoError(t, err)
@@ -235,7 +235,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledTwice(t *testing.T) {
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
-	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnTx(txmocks.NilTx, opts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), opts)
 	requireNoError(t, err)
@@ -259,7 +259,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Call_With_Unexpected_Opts(t *testing
 
 	testReporter := newMockTestReporter(t, tFatalMessage)
 
-	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, expectedOpts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnTx(txmocks.NilTx, expectedOpts)(testReporter)
 
 	tx, err := provider.BeginTx(context.Background(), callOpts)
 	requireNotNil(t, tx)
@@ -271,7 +271,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_Expect_But_Not_Called(t *testing.T) 
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
-	mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
+	txmocks.ExpectBeginTxAndReturnTx(txmocks.NilTx, opts)(testReporter)
 }
 
 func Test_Provider_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
@@ -279,7 +279,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
-	provider := mocks.ExpectBeginTxAndReturnTx(mocks.ExpectNothing, opts)(testReporter)
+	provider := txmocks.ExpectBeginTxAndReturnTx(txmocks.NilTx, opts)(testReporter)
 
 	tx, err := provider.Begin(context.Background())
 	requireNil(t, tx)
@@ -288,8 +288,8 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
 
 type ProviderJoinTest struct {
 	CaseName          string
-	ProviderTemplates []mocks.ProviderMock
-	WithProvider      func(t *testing.T, p transaction.Provider)
+	ProviderTemplates []txmocks.ProviderMock
+	WithProvider      func(t *testing.T, p tx.Provider)
 	TFatalMessage     string
 }
 
@@ -300,7 +300,7 @@ func (p *ProviderJoinTest) Name() string {
 func (p *ProviderJoinTest) Test(t *testing.T) {
 	testReporter := newMockTestReporter(t, p.TFatalMessage)
 
-	provider := mocks.ProviderJoin(p.ProviderTemplates...)(testReporter)
+	provider := txmocks.JoinProviders(p.ProviderTemplates...)(testReporter)
 
 	if p.WithProvider != nil {
 		p.WithProvider(t, provider)
@@ -327,10 +327,10 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "single operation, valid",
-			ProviderTemplates: []mocks.ProviderMock{
-				mocks.ExpectBeginAndReturnError(errBeginTx),
+			ProviderTemplates: []txmocks.ProviderMock{
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p transaction.Provider) {
+			WithProvider: func(t *testing.T, p tx.Provider) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -338,10 +338,10 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "single operation, not valid",
-			ProviderTemplates: []mocks.ProviderMock{
-				mocks.ExpectBeginAndReturnError(errBeginTx),
+			ProviderTemplates: []txmocks.ProviderMock{
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p transaction.Provider) {
+			WithProvider: func(t *testing.T, p tx.Provider) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -354,11 +354,11 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, valid",
-			ProviderTemplates: []mocks.ProviderMock{
-				mocks.ExpectBeginAndReturnError(errBeginTx),
-				mocks.ExpectBeginAndReturnError(errBeginTx),
+			ProviderTemplates: []txmocks.ProviderMock{
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p transaction.Provider) {
+			WithProvider: func(t *testing.T, p tx.Provider) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -370,11 +370,11 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, invalid count times",
-			ProviderTemplates: []mocks.ProviderMock{
-				mocks.ExpectBeginAndReturnError(errBeginTx),
-				mocks.ExpectBeginAndReturnError(errBeginTx),
+			ProviderTemplates: []txmocks.ProviderMock{
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p transaction.Provider) {
+			WithProvider: func(t *testing.T, p tx.Provider) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -391,11 +391,11 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, valid order",
-			ProviderTemplates: []mocks.ProviderMock{
-				mocks.ExpectBeginAndReturnError(errBeginTx),
-				mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
+			ProviderTemplates: []txmocks.ProviderMock{
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
+				txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 			},
-			WithProvider: func(t *testing.T, p transaction.Provider) {
+			WithProvider: func(t *testing.T, p tx.Provider) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -407,11 +407,11 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "two operations, invalid order",
-			ProviderTemplates: []mocks.ProviderMock{
-				mocks.ExpectBeginAndReturnError(errBeginTx),
-				mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
+			ProviderTemplates: []txmocks.ProviderMock{
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
+				txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 			},
-			WithProvider: func(t *testing.T, p transaction.Provider) {
+			WithProvider: func(t *testing.T, p tx.Provider) {
 				tx, err := p.BeginTx(context.Background(), opts)
 				requireNil(t, err)
 				requireNil(t, tx)
@@ -424,13 +424,13 @@ func Test_Provider_Join(t *testing.T) {
 		},
 		&ProviderJoinTest{
 			CaseName: "many operations, with transactions",
-			ProviderTemplates: []mocks.ProviderMock{
-				mocks.ExpectBeginAndReturnError(errBeginTx),
-				mocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
-				mocks.ExpectBeginAndReturnTx(mocks.ExpectCommit),
-				mocks.ExpectBeginTxAndReturnTx(mocks.ExpectRollback(nil), opts),
+			ProviderTemplates: []txmocks.ProviderMock{
+				txmocks.ExpectBeginAndReturnError(errBeginTx),
+				txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
+				txmocks.ExpectBeginAndReturnTx(txmocks.ExpectCommit),
+				txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectRollback(nil), opts),
 			},
-			WithProvider: func(t *testing.T, p transaction.Provider) {
+			WithProvider: func(t *testing.T, p tx.Provider) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)

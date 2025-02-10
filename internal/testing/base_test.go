@@ -1,4 +1,4 @@
-package transaction_test
+package tx_test
 
 import (
 	context "context"
@@ -6,12 +6,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/amidgo/transaction"
-	sqlxtransaction "github.com/amidgo/transaction/sqlx"
-	stdlibtransaction "github.com/amidgo/transaction/stdlib"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
+
+	"github.com/amidgo/tx"
+
+	sqltx "github.com/amidgo/tx/sql"
+	sqlxtx "github.com/amidgo/tx/sqlx"
 )
 
 type executor interface {
@@ -21,15 +23,15 @@ type executor interface {
 
 var (
 	_ executor = bun.IDB(nil)
-	_ executor = stdlibtransaction.Executor(nil)
-	_ executor = sqlxtransaction.Executor(nil)
+	_ executor = sqltx.Executor(nil)
+	_ executor = sqlxtx.Executor(nil)
 )
 
 func assertTxCommit(
 	t *testing.T,
-	provider transaction.Provider,
+	provider tx.Provider,
 	exec executor,
-	tx transaction.Transaction,
+	tx tx.Tx,
 	db *sql.DB,
 ) {
 	expectedUserID := uuid.New()
@@ -53,9 +55,9 @@ func assertTxCommit(
 
 func assertBunTxCommit(
 	t *testing.T,
-	provider transaction.Provider,
+	provider tx.Provider,
 	exec executor,
-	tx transaction.Transaction,
+	tx tx.Tx,
 	db *sql.DB,
 ) {
 	expectedUserID := uuid.New()
@@ -79,9 +81,9 @@ func assertBunTxCommit(
 
 func assertTxRollback(
 	t *testing.T,
-	provider transaction.Provider,
+	provider tx.Provider,
 	exec executor,
-	tx transaction.Transaction,
+	tx tx.Tx,
 	db *sql.DB,
 ) {
 	expectedUserID := uuid.New()
@@ -105,9 +107,9 @@ func assertTxRollback(
 
 func assertBunTxRollback(
 	t *testing.T,
-	provider transaction.Provider,
+	provider tx.Provider,
 	exec executor,
-	tx transaction.Transaction,
+	tx tx.Tx,
 	db *sql.DB,
 ) {
 	expectedUserID := uuid.New()

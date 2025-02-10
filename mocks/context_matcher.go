@@ -1,10 +1,10 @@
-package transactionmocks
+package txmocks
 
 import (
 	"context"
 	"strconv"
 
-	"github.com/amidgo/transaction"
+	"github.com/amidgo/tx"
 )
 
 type Matcher interface {
@@ -27,7 +27,7 @@ func TxDisabled() Matcher {
 }
 
 type txMatcher struct {
-	provider transaction.Provider
+	provider tx.Provider
 	enabled  bool
 }
 

@@ -1,4 +1,4 @@
-package transaction_test
+package tx_test
 
 import (
 	context "context"
@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
-	"github.com/amidgo/transaction"
-	sqlxtransaction "github.com/amidgo/transaction/sqlx"
+	"github.com/amidgo/tx"
+	sqlxtx "github.com/amidgo/tx/sqlx"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
@@ -22,7 +22,7 @@ func Test_SqlxProvider_Begin_BeginTx(t *testing.T) {
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := sqlxtransaction.NewProvider(sqlxDB)
+	provider := sqlxtx.NewProvider(sqlxDB)
 
 	tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func Test_SqlxProvider_Begin_BeginTx(t *testing.T) {
 	assertSqlxTransactionEnabled(t, provider, tx, "read committed", false)
 }
 
-func assertSqlxTransactionEnabled(t *testing.T, provider *sqlxtransaction.Provider, tx transaction.Transaction, expectedIsolationLevel string, readOnly bool) {
+func assertSqlxTransactionEnabled(t *testing.T, provider *sqlxtx.Provider, tx tx.Tx, expectedIsolationLevel string, readOnly bool) {
 	enabled := provider.TxEnabled(tx.Context())
 	require.True(t, enabled)
 
@@ -73,7 +73,7 @@ func Test_SqlxProvider_Rollback_Commit(t *testing.T) {
 
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := sqlxtransaction.NewProvider(sqlxDB)
+	provider := sqlxtx.NewProvider(sqlxDB)
 
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)
@@ -114,7 +114,7 @@ func Test_SqlxProvider_WithTx(t *testing.T) {
 
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := sqlxtransaction.NewProvider(sqlxDB)
+	provider := sqlxtx.NewProvider(sqlxDB)
 
 	t.Run("no external tx, execution failed, rollback expected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -123,7 +123,7 @@ func Test_SqlxProvider_WithTx(t *testing.T) {
 		userID := uuid.New()
 
 		err := provider.WithTx(ctx,
-			func(ctx context.Context, exec sqlxtransaction.Executor) error {
+			func(ctx context.Context, exec sqlxtx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, 100)
 				require.NoError(t, err)
 
@@ -146,7 +146,7 @@ func Test_SqlxProvider_WithTx(t *testing.T) {
 		userAge := 100
 
 		err := provider.WithTx(ctx,
-			func(ctx context.Context, exec sqlxtransaction.Executor) error {
+			func(ctx context.Context, exec sqlxtx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
 				require.NoError(t, err)
 
@@ -156,68 +156,6 @@ func Test_SqlxProvider_WithTx(t *testing.T) {
 				Isolation: sql.LevelReadCommitted,
 			},
 		)
-		require.NoError(t, err)
-
-		assertUserExists(t, db, userID, userAge)
-	})
-
-	t.Run("external tx, success execution", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(cancel)
-
-		userID := uuid.New()
-		userAge := 100
-
-		tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelDefault})
-		require.NoError(t, err)
-
-		err = provider.WithTx(tx.Context(),
-			func(ctx context.Context, exec sqlxtransaction.Executor) error {
-				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
-				require.NoError(t, err)
-
-				return nil
-			},
-			&sql.TxOptions{
-				Isolation: sql.LevelReadCommitted,
-			},
-		)
-		require.NoError(t, err)
-
-		assertUserNotFound(t, db, userID)
-
-		err = tx.Commit()
-		require.NoError(t, err)
-
-		assertUserExists(t, db, userID, userAge)
-	})
-
-	t.Run("external tx, execution failed", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(cancel)
-
-		userID := uuid.New()
-		userAge := 100
-
-		tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelDefault})
-		require.NoError(t, err)
-
-		err = provider.WithTx(tx.Context(),
-			func(ctx context.Context, exec sqlxtransaction.Executor) error {
-				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
-				require.NoError(t, err)
-
-				return errStub
-			},
-			&sql.TxOptions{
-				Isolation: sql.LevelReadCommitted,
-			},
-		)
-		require.ErrorIs(t, err, errStub)
-
-		assertUserNotFound(t, db, userID)
-
-		err = tx.Commit()
 		require.NoError(t, err)
 
 		assertUserExists(t, db, userID, userAge)

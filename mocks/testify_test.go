@@ -1,4 +1,4 @@
-package transactionmocks_test
+package txmocks_test
 
 import (
 	"errors"
