@@ -3,7 +3,7 @@ package tx
 import "testing"
 
 func Test_driverProvider(t *testing.T) {
-	provider := &driverProvider{}
+	provider := &driverBeginner{}
 
 	_, ok := getDriver(provider)
 	if !ok {

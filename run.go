@@ -7,48 +7,34 @@ import (
 	"fmt"
 )
 
-var ErrSerialization = errors.New("serialization error")
-
-type Tx interface {
-	Context() context.Context
-	Commit() error
-	Rollback() error
-}
-
-type Provider interface {
-	Begin(ctx context.Context) (Tx, error)
-	BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
-	TxEnabled(ctx context.Context) bool
-}
-
-type Options struct {
+type options struct {
 	serializationRetryCount int
 }
 
-type Option func(*Options)
+type Option func(*options)
 
 func RetrySerialization(times int) Option {
-	return func(o *Options) {
+	return func(o *options) {
 		o.serializationRetryCount = times
 	}
 }
 
-func WithTx(
+func Run(
 	ctx context.Context,
-	provider Provider,
+	beginner Beginner,
 	withTx func(txContext context.Context) error,
 	txOpts *sql.TxOptions,
 	opts ...Option,
 ) error {
-	options := &Options{}
+	options := &options{}
 
 	for _, op := range opts {
 		op(options)
 	}
 
-	driver, _ := getDriver(provider)
+	driver, _ := getDriver(beginner)
 
-	tx, err := provider.BeginTx(ctx, txOpts)
+	tx, err := beginner.BeginTx(ctx, txOpts)
 
 	err = driverError(driver, err)
 	if err != nil {
@@ -73,7 +59,7 @@ func WithTx(
 		finished = true
 		_ = tx.Rollback()
 
-		retryErr := retry(ctx, driver, provider, withTx, txOpts, options.serializationRetryCount)
+		retryErr := retry(ctx, driver, beginner, withTx, txOpts, options.serializationRetryCount)
 		if retryErr != nil {
 			return fmt.Errorf("retry %w, %w, after %d retries", err, retryErr, options.serializationRetryCount)
 		}
@@ -91,7 +77,7 @@ func WithTx(
 		finished = true
 		_ = tx.Rollback()
 
-		retryErr := retry(ctx, driver, provider, withTx, txOpts, options.serializationRetryCount)
+		retryErr := retry(ctx, driver, beginner, withTx, txOpts, options.serializationRetryCount)
 		if retryErr != nil {
 			return fmt.Errorf("retry %w, %w, after %d retries", err, retryErr, options.serializationRetryCount)
 		}
@@ -111,7 +97,7 @@ var errRepeatTimesExcedeed = errors.New("repeat times exceeded")
 func retry(
 	ctx context.Context,
 	driver Driver,
-	provider Provider,
+	provider Beginner,
 	withTx func(ctx context.Context) error,
 	txOpts *sql.TxOptions,
 	repeatTimes int,

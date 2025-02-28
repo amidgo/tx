@@ -29,7 +29,7 @@ var (
 
 func assertTxCommit(
 	t *testing.T,
-	provider tx.Provider,
+	provider tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
@@ -55,7 +55,7 @@ func assertTxCommit(
 
 func assertBunTxCommit(
 	t *testing.T,
-	provider tx.Provider,
+	provider tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
@@ -81,7 +81,7 @@ func assertBunTxCommit(
 
 func assertTxRollback(
 	t *testing.T,
-	provider tx.Provider,
+	provider tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
@@ -107,7 +107,7 @@ func assertTxRollback(
 
 func assertBunTxRollback(
 	t *testing.T,
-	provider tx.Provider,
+	provider tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,

@@ -9,42 +9,42 @@ import (
 	"github.com/amidgo/tx"
 )
 
-var _ tx.Provider = (*Provider)(nil)
+var _ tx.Beginner = (*Beginner)(nil)
 
-type providerAsserter interface {
+type beginnerAsserter interface {
 	assert()
 	begin(ctx context.Context) (tx.Tx, error)
 	beginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, error)
 }
 
-type Provider struct {
-	asrt providerAsserter
+type Beginner struct {
+	asrt beginnerAsserter
 }
 
-func newProvider(t testReporter, asrt providerAsserter) *Provider {
+func newProvider(t testReporter, asrt beginnerAsserter) *Beginner {
 	t.Cleanup(asrt.assert)
 
-	return &Provider{asrt: asrt}
+	return &Beginner{asrt: asrt}
 }
 
-func (p *Provider) Begin(ctx context.Context) (tx.Tx, error) {
+func (p *Beginner) Begin(ctx context.Context) (tx.Tx, error) {
 	return p.asrt.begin(ctx)
 }
 
-func (p *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, error) {
+func (p *Beginner) BeginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, error) {
 	return p.asrt.beginTx(ctx, opts)
 }
 
-func (b *Provider) TxEnabled(ctx context.Context) bool {
+func (b *Beginner) TxEnabled(ctx context.Context) bool {
 	_, ok := ctx.Value(txKey{}).(mockTx)
 
 	return ok
 }
 
-type ProviderMock func(t testReporter) *Provider
+type ProviderMock func(t testReporter) *Beginner
 
 func ExpectBeginAndReturnError(beginError error) ProviderMock {
-	return func(t testReporter) *Provider {
+	return func(t testReporter) *Beginner {
 		asrt := &beginAndReturnError{
 			t:   t,
 			err: beginError,
@@ -83,7 +83,7 @@ func (b *beginAndReturnError) assert() {
 }
 
 func ExpectBeginTxAndReturnError(beginError error, expectedOpts *sql.TxOptions) ProviderMock {
-	return func(t testReporter) *Provider {
+	return func(t testReporter) *Beginner {
 		asrt := &beginTxAndReturnError{
 			t:            t,
 			err:          beginError,
@@ -126,7 +126,7 @@ func (b *beginTxAndReturnError) assert() {
 }
 
 func ExpectBeginAndReturnTx(txMock TxMock) ProviderMock {
-	return func(t testReporter) *Provider {
+	return func(t testReporter) *Beginner {
 		asrt := &beginAndReturnTx{
 			t:  t,
 			tx: txMock(t),
@@ -167,7 +167,7 @@ func (b *beginAndReturnTx) assert() {
 }
 
 func ExpectBeginTxAndReturnTx(tx TxMock, opts *sql.TxOptions) ProviderMock {
-	return func(t testReporter) *Provider {
+	return func(t testReporter) *Beginner {
 		asrt := &beginTxAndReturnTx{
 			t:            t,
 			tx:           tx(t),
@@ -237,7 +237,7 @@ func tFatalUnexpectedOpts(t testReporter, expected, actual *sql.TxOptions) {
 }
 
 func JoinProviders(providers ...ProviderMock) ProviderMock {
-	return func(t testReporter) *Provider {
+	return func(t testReporter) *Beginner {
 		switch len(providers) {
 		case 0:
 			t.Fatal("empty join provider templates")
@@ -247,7 +247,7 @@ func JoinProviders(providers ...ProviderMock) ProviderMock {
 			return providers[0](t)
 		}
 
-		asrts := make([]providerAsserter, len(providers))
+		asrts := make([]beginnerAsserter, len(providers))
 
 		for i := range providers {
 			index := len(providers) - 1 - i
@@ -274,7 +274,7 @@ func JoinProviders(providers ...ProviderMock) ProviderMock {
 
 type providerAsserterJoin struct {
 	t            testReporter
-	asrts        []providerAsserter
+	asrts        []beginnerAsserter
 	currentIndex int
 	mu           sync.Mutex
 }
@@ -321,7 +321,7 @@ func (p *providerAsserterJoin) assert() {
 	}
 }
 
-func (p *providerAsserterJoin) currentAsserter() (providerAsserter, bool) {
+func (p *providerAsserterJoin) currentAsserter() (beginnerAsserter, bool) {
 	if p.currentIndex > len(p.asrts)-1 {
 		return nil, false
 	}

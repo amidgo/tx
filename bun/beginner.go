@@ -42,19 +42,19 @@ func (s *tx) clearTx() {
 	})
 }
 
-var _ ttn.Provider = (*Provider)(nil)
+var _ ttn.Beginner = (*Beginner)(nil)
 
-type Provider struct {
+type Beginner struct {
 	db *bun.DB
 }
 
-func NewProvider(db *bun.DB) *Provider {
-	return &Provider{
+func NewBeginner(db *bun.DB) *Beginner {
+	return &Beginner{
 		db: db,
 	}
 }
 
-func (s *Provider) Begin(ctx context.Context) (ttn.Tx, error) {
+func (s *Beginner) Begin(ctx context.Context) (ttn.Tx, error) {
 	bunTx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (s *Provider) Begin(ctx context.Context) (ttn.Tx, error) {
 	}, nil
 }
 
-func (s *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Tx, error) {
+func (s *Beginner) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Tx, error) {
 	bunTx, err := s.db.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -78,23 +78,23 @@ func (s *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Tx, er
 	}, nil
 }
 
-func (s *Provider) txContext(ctx context.Context, bunTx bun.Tx) context.Context {
+func (s *Beginner) txContext(ctx context.Context, bunTx bun.Tx) context.Context {
 	return context.WithValue(ctx, txKey{}, bunTx)
 }
 
-func (s *Provider) Executor(ctx context.Context) Executor {
+func (s *Beginner) Executor(ctx context.Context) Executor {
 	executor, _ := s.executor(ctx)
 
 	return executor
 }
 
-func (s *Provider) TxEnabled(ctx context.Context) bool {
+func (s *Beginner) TxEnabled(ctx context.Context) bool {
 	_, ok := s.executor(ctx)
 
 	return ok
 }
 
-func (s *Provider) executor(ctx context.Context) (Executor, bool) {
+func (s *Beginner) executor(ctx context.Context) (Executor, bool) {
 	tx, ok := ctx.Value(txKey{}).(bun.Tx)
 	if !ok {
 		return s.db, false
@@ -103,13 +103,13 @@ func (s *Provider) executor(ctx context.Context) (Executor, bool) {
 	return tx, true
 }
 
-func (s *Provider) WithTx(
+func (s *Beginner) WithTx(
 	ctx context.Context,
 	f func(ctx context.Context, exec Executor) error,
 	txOpts *sql.TxOptions,
 	opts ...ttn.Option,
 ) error {
-	return ttn.WithTx(ctx, s,
+	return ttn.Run(ctx, s,
 		func(txContext context.Context) error {
 			exec := s.Executor(txContext)
 

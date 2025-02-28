@@ -41,15 +41,15 @@ func (s *tx) clearTx() {
 	})
 }
 
-type Provider struct {
+type Beginner struct {
 	db *sql.DB
 }
 
-func NewProvider(db *sql.DB) *Provider {
-	return &Provider{db: db}
+func NewBeginner(db *sql.DB) *Beginner {
+	return &Beginner{db: db}
 }
 
-func (s *Provider) Begin(ctx context.Context) (ttn.Tx, error) {
+func (s *Beginner) Begin(ctx context.Context) (ttn.Tx, error) {
 	sqlTx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (s *Provider) Begin(ctx context.Context) (ttn.Tx, error) {
 	}, nil
 }
 
-func (s *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Tx, error) {
+func (s *Beginner) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Tx, error) {
 	sqlTx, err := s.db.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -73,23 +73,23 @@ func (s *Provider) BeginTx(ctx context.Context, opts *sql.TxOptions) (ttn.Tx, er
 	}, nil
 }
 
-func (s *Provider) txContext(ctx context.Context, sqlTx *sql.Tx) context.Context {
+func (s *Beginner) txContext(ctx context.Context, sqlTx *sql.Tx) context.Context {
 	return context.WithValue(ctx, txKey{}, sqlTx)
 }
 
-func (s *Provider) Executor(ctx context.Context) Executor {
+func (s *Beginner) Executor(ctx context.Context) Executor {
 	executor, _ := s.executor(ctx)
 
 	return executor
 }
 
-func (s *Provider) TxEnabled(ctx context.Context) bool {
+func (s *Beginner) TxEnabled(ctx context.Context) bool {
 	_, ok := s.executor(ctx)
 
 	return ok
 }
 
-func (s *Provider) executor(ctx context.Context) (Executor, bool) {
+func (s *Beginner) executor(ctx context.Context) (Executor, bool) {
 	tx, ok := ctx.Value(txKey{}).(*sql.Tx)
 	if !ok {
 		return s.db, false
@@ -98,13 +98,13 @@ func (s *Provider) executor(ctx context.Context) (Executor, bool) {
 	return tx, true
 }
 
-func (s *Provider) WithTx(
+func (s *Beginner) WithTx(
 	ctx context.Context,
 	withTx func(ctx context.Context, exec Executor) error,
 	txOpts *sql.TxOptions,
 	opts ...ttn.Option,
 ) error {
-	return ttn.WithTx(ctx, s,
+	return ttn.Run(ctx, s,
 		func(txContext context.Context) error {
 			exec := s.Executor(txContext)
 

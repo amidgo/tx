@@ -20,7 +20,7 @@ func Test_SQLProvider_Begin_BeginTx(t *testing.T) {
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
 
-	provider := sqltx.NewProvider(db)
+	provider := sqltx.NewBeginner(db)
 
 	exec := provider.Executor(ctx)
 	_, ok := exec.(*sql.DB)
@@ -44,7 +44,7 @@ func Test_SQLProvider_Begin_BeginTx(t *testing.T) {
 
 func assertSQLTransactionEnabled(
 	t *testing.T,
-	provider *sqltx.Provider,
+	provider *sqltx.Beginner,
 	tx tx.Tx,
 	expectedIsolationLevel string,
 	readOnly bool,
@@ -95,7 +95,7 @@ func Test_SQLProvider_Rollback_Commit(t *testing.T) {
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
 
-	provider := sqltx.NewProvider(db)
+	provider := sqltx.NewBeginner(db)
 
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)
@@ -134,7 +134,7 @@ func Test_SQLProvider_WithTx(t *testing.T) {
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
 
-	provider := sqltx.NewProvider(db)
+	provider := sqltx.NewBeginner(db)
 
 	t.Run("no external tx, execution failed, rollback expected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

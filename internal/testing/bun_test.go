@@ -25,7 +25,7 @@ func Test_BunProvider_Begin_BeginTx(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := buntx.NewProvider(bunDB)
+	provider := buntx.NewBeginner(bunDB)
 
 	exec := provider.Executor(ctx)
 	_, ok := exec.(*bun.DB)
@@ -63,7 +63,7 @@ func Test_BunProvider_Rollback_Commit(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := buntx.NewProvider(bunDB)
+	provider := buntx.NewBeginner(bunDB)
 
 	tx, err := provider.Begin(ctx)
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func Test_BunProvider_WithTx(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := buntx.NewProvider(bunDB)
+	provider := buntx.NewBeginner(bunDB)
 
 	t.Run("no external tx, execution failed, rollback expected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -152,7 +152,7 @@ func Test_BunProvider_WithTx(t *testing.T) {
 	})
 }
 
-func assertBunTransactionEnabled(t *testing.T, provider *buntx.Provider, tx tx.Tx, expectedIsolationLevel string, readOnly bool) {
+func assertBunTransactionEnabled(t *testing.T, provider *buntx.Beginner, tx tx.Tx, expectedIsolationLevel string, readOnly bool) {
 	enabled := provider.TxEnabled(tx.Context())
 	require.True(t, enabled)
 

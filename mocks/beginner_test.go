@@ -289,7 +289,7 @@ func Test_Provider_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
 type ProviderJoinTest struct {
 	CaseName          string
 	ProviderTemplates []txmocks.ProviderMock
-	WithProvider      func(t *testing.T, p tx.Provider)
+	WithProvider      func(t *testing.T, p tx.Beginner)
 	TFatalMessage     string
 }
 
@@ -330,7 +330,7 @@ func Test_Provider_Join(t *testing.T) {
 			ProviderTemplates: []txmocks.ProviderMock{
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p tx.Provider) {
+			WithProvider: func(t *testing.T, p tx.Beginner) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -341,7 +341,7 @@ func Test_Provider_Join(t *testing.T) {
 			ProviderTemplates: []txmocks.ProviderMock{
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p tx.Provider) {
+			WithProvider: func(t *testing.T, p tx.Beginner) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -358,7 +358,7 @@ func Test_Provider_Join(t *testing.T) {
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p tx.Provider) {
+			WithProvider: func(t *testing.T, p tx.Beginner) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -374,7 +374,7 @@ func Test_Provider_Join(t *testing.T) {
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 			},
-			WithProvider: func(t *testing.T, p tx.Provider) {
+			WithProvider: func(t *testing.T, p tx.Beginner) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -395,7 +395,7 @@ func Test_Provider_Join(t *testing.T) {
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 				txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 			},
-			WithProvider: func(t *testing.T, p tx.Provider) {
+			WithProvider: func(t *testing.T, p tx.Beginner) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)
@@ -411,7 +411,7 @@ func Test_Provider_Join(t *testing.T) {
 				txmocks.ExpectBeginAndReturnError(errBeginTx),
 				txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 			},
-			WithProvider: func(t *testing.T, p tx.Provider) {
+			WithProvider: func(t *testing.T, p tx.Beginner) {
 				tx, err := p.BeginTx(context.Background(), opts)
 				requireNil(t, err)
 				requireNil(t, tx)
@@ -430,7 +430,7 @@ func Test_Provider_Join(t *testing.T) {
 				txmocks.ExpectBeginAndReturnTx(txmocks.ExpectCommit),
 				txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectRollback(nil), opts),
 			},
-			WithProvider: func(t *testing.T, p tx.Provider) {
+			WithProvider: func(t *testing.T, p tx.Beginner) {
 				tx, err := p.Begin(context.Background())
 				requireErrorIs(t, err, errBeginTx)
 				requireNil(t, tx)

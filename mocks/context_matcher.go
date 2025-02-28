@@ -14,20 +14,20 @@ type Matcher interface {
 
 func TxEnabled() Matcher {
 	return &txMatcher{
-		provider: &Provider{},
+		beginner: &Beginner{},
 		enabled:  true,
 	}
 }
 
 func TxDisabled() Matcher {
 	return &txMatcher{
-		provider: &Provider{},
+		beginner: &Beginner{},
 		enabled:  false,
 	}
 }
 
 type txMatcher struct {
-	provider tx.Provider
+	beginner tx.Beginner
 	enabled  bool
 }
 
@@ -37,7 +37,7 @@ func (t txMatcher) Matches(x any) bool {
 		return false
 	}
 
-	return t.provider.TxEnabled(ctx) == t.enabled
+	return t.beginner.TxEnabled(ctx) == t.enabled
 }
 
 func (t txMatcher) String() string {

@@ -11,7 +11,7 @@ import (
 	txmocks "github.com/amidgo/tx/mocks"
 )
 
-type WithTxTest struct {
+type runTest struct {
 	Name          string
 	Provider      txmocks.ProviderMock
 	WithTx        func(t *testing.T, ctx context.Context) error
@@ -19,7 +19,7 @@ type WithTxTest struct {
 	ExpectedError error
 }
 
-func (w *WithTxTest) Test(t *testing.T) {
+func (w *runTest) Test(t *testing.T) {
 	provider := w.Provider(t)
 	defer func() {
 		err := recover()
@@ -43,7 +43,7 @@ func (w *WithTxTest) Test(t *testing.T) {
 		}
 	}
 
-	err := tx.WithTx(
+	err := tx.Run(
 		context.Background(),
 		provider,
 		withTx,
@@ -58,7 +58,7 @@ func (w *WithTxTest) Test(t *testing.T) {
 	}
 }
 
-func Test_WithTx(t *testing.T) {
+func Test_Run(t *testing.T) {
 	var (
 		errBeginTx = errors.New("begin tx")
 		errWithTx  = errors.New("with tx")
@@ -70,7 +70,7 @@ func Test_WithTx(t *testing.T) {
 		ReadOnly:  true,
 	}
 
-	tests := []*WithTxTest{
+	tests := []*runTest{
 		{
 			Name:          "failed begin tx",
 			Provider:      txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
@@ -131,7 +131,7 @@ func Test_WithTx(t *testing.T) {
 	}
 }
 
-type WithTxDriverTest struct {
+type runDriverTest struct {
 	Name           string
 	DriverMock     txmocks.DriverMock
 	ProviderMock   txmocks.ProviderMock
@@ -141,8 +141,8 @@ type WithTxDriverTest struct {
 	ExpectedErrors []error
 }
 
-func (w *WithTxDriverTest) Test(t *testing.T) {
-	provider := tx.DriverProvider(
+func (w *runDriverTest) Test(t *testing.T) {
+	provider := tx.BeginnerWithDriver(
 		w.ProviderMock(t),
 		w.DriverMock(t),
 	)
@@ -154,7 +154,7 @@ func (w *WithTxDriverTest) Test(t *testing.T) {
 		return w.WithTx(t, txContext)
 	}
 
-	err := tx.WithTx(ctx,
+	err := tx.Run(ctx,
 		provider,
 		withTx,
 		w.TxOpts,
@@ -172,7 +172,7 @@ func (w *WithTxDriverTest) Test(t *testing.T) {
 	}
 }
 
-func Test_WithTx_Driver(t *testing.T) {
+func Test_Run_Driver(t *testing.T) {
 	withTx := func(count int, err error) func(t *testing.T, ctx context.Context) error {
 		called := 0
 
@@ -193,7 +193,7 @@ func Test_WithTx_Driver(t *testing.T) {
 		Isolation: sql.LevelSerializable,
 	}
 
-	tests := []*WithTxDriverTest{
+	tests := []*runDriverTest{
 		{
 			Name:       "success, no driver calls occured",
 			DriverMock: txmocks.NilDriver,
