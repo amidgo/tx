@@ -17,7 +17,6 @@ type Tx interface {
 type Beginner interface {
 	Begin(ctx context.Context) (Tx, error)
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
-	TxEnabled(ctx context.Context) bool
 }
 
 type Driver interface {

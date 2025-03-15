@@ -3,8 +3,6 @@ package txmocks
 import (
 	"context"
 	"strconv"
-
-	"github.com/amidgo/tx"
 )
 
 type Matcher interface {
@@ -14,21 +12,18 @@ type Matcher interface {
 
 func TxEnabled() Matcher {
 	return &txMatcher{
-		beginner: &Beginner{},
-		enabled:  true,
+		enabled: true,
 	}
 }
 
 func TxDisabled() Matcher {
 	return &txMatcher{
-		beginner: &Beginner{},
-		enabled:  false,
+		enabled: false,
 	}
 }
 
 type txMatcher struct {
-	beginner tx.Beginner
-	enabled  bool
+	enabled bool
 }
 
 func (t txMatcher) Matches(x any) bool {
@@ -37,7 +32,7 @@ func (t txMatcher) Matches(x any) bool {
 		return false
 	}
 
-	return t.beginner.TxEnabled(ctx) == t.enabled
+	return txEnabled(ctx) == t.enabled
 }
 
 func (t txMatcher) String() string {

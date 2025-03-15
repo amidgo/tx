@@ -29,7 +29,7 @@ var (
 
 func assertTxCommit(
 	t *testing.T,
-	provider tx.Beginner,
+	beginner tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
@@ -49,13 +49,14 @@ func assertTxCommit(
 
 	assertUserExists(t, db, expectedUserID, expectedUserAge)
 
-	enabled := provider.TxEnabled(tx.Context())
+	enabled := txEnabled(tx.Context(), beginner)
+
 	require.False(t, enabled)
 }
 
 func assertBunTxCommit(
 	t *testing.T,
-	provider tx.Beginner,
+	beginner tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
@@ -75,13 +76,13 @@ func assertBunTxCommit(
 
 	assertUserExists(t, db, expectedUserID, expectedUserAge)
 
-	enabled := provider.TxEnabled(tx.Context())
+	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
 func assertTxRollback(
 	t *testing.T,
-	provider tx.Beginner,
+	beginner tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
@@ -101,13 +102,13 @@ func assertTxRollback(
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	enabled := provider.TxEnabled(tx.Context())
+	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
 func assertBunTxRollback(
 	t *testing.T,
-	provider tx.Beginner,
+	beginner tx.Beginner,
 	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
@@ -127,7 +128,7 @@ func assertBunTxRollback(
 
 	assertUserNotFound(t, db, expectedUserID)
 
-	enabled := provider.TxEnabled(tx.Context())
+	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
@@ -175,4 +176,12 @@ func (t *transactionReadOnly) Scan(src any) error {
 	default:
 		return errInvalidTransactionReadOnlyValue
 	}
+}
+
+func txEnabled(ctx context.Context, beginner tx.Beginner) bool {
+	enabled := beginner.(interface {
+		TxEnabled(ctx context.Context) bool
+	})
+
+	return enabled.TxEnabled(ctx)
 }

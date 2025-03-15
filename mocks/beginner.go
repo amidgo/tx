@@ -36,6 +36,10 @@ func (p *Beginner) BeginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, err
 }
 
 func (b *Beginner) TxEnabled(ctx context.Context) bool {
+	return txEnabled(ctx)
+}
+
+func txEnabled(ctx context.Context) bool {
 	_, ok := ctx.Value(txKey{}).(mockTx)
 
 	return ok
