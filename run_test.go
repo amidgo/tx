@@ -13,14 +13,14 @@ import (
 
 type runTest struct {
 	Name          string
-	Provider      txmocks.ProviderMock
+	Beginner      txmocks.BeginnerMock
 	WithTx        func(t *testing.T, ctx context.Context) error
 	Opts          *sql.TxOptions
 	ExpectedError error
 }
 
 func (w *runTest) Test(t *testing.T) {
-	provider := w.Provider(t)
+	beginner := w.Beginner(t)
 	defer func() {
 		err := recover()
 		if err == nil {
@@ -45,13 +45,13 @@ func (w *runTest) Test(t *testing.T) {
 
 	err := tx.Run(
 		context.Background(),
-		provider,
+		beginner,
 		withTx,
 		w.Opts,
 	)
 	if !errors.Is(err, w.ExpectedError) {
 		t.Fatalf(
-			"unexpected error from transaction.WithProvider, expected %+v, actual %+v",
+			"unexpected error from tx.Run, expected %+v, actual %+v",
 			w.ExpectedError,
 			err,
 		)
@@ -73,13 +73,13 @@ func Test_Run(t *testing.T) {
 	tests := []*runTest{
 		{
 			Name:          "failed begin tx",
-			Provider:      txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
+			Beginner:      txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
 			Opts:          opts,
 			ExpectedError: errBeginTx,
 		},
 		{
 			Name:     "with tx returned error",
-			Provider: txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectRollback(nil), opts),
+			Beginner: txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectRollback(nil), opts),
 			WithTx: func(t *testing.T, ctx context.Context) error {
 				checkTxEnabled(t, ctx)
 
@@ -90,7 +90,7 @@ func Test_Run(t *testing.T) {
 		},
 		{
 			Name:     "with tx paniced",
-			Provider: txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectRollback(nil), opts),
+			Beginner: txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectRollback(nil), opts),
 			WithTx: func(t *testing.T, ctx context.Context) error {
 				checkTxEnabled(t, ctx)
 
@@ -101,7 +101,7 @@ func Test_Run(t *testing.T) {
 		},
 		{
 			Name: "commit returned error",
-			Provider: txmocks.ExpectBeginTxAndReturnTx(
+			Beginner: txmocks.ExpectBeginTxAndReturnTx(
 				txmocks.ExpectRollbackAfterFailedCommit(errCommit),
 				opts,
 			),
@@ -115,7 +115,7 @@ func Test_Run(t *testing.T) {
 		},
 		{
 			Name:     "commit success",
-			Provider: txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectCommit, opts),
+			Beginner: txmocks.ExpectBeginTxAndReturnTx(txmocks.ExpectCommit, opts),
 			WithTx: func(t *testing.T, ctx context.Context) error {
 				checkTxEnabled(t, ctx)
 
@@ -134,7 +134,7 @@ func Test_Run(t *testing.T) {
 type runDriverTest struct {
 	Name           string
 	DriverMock     txmocks.DriverMock
-	ProviderMock   txmocks.ProviderMock
+	BeginnerMock   txmocks.BeginnerMock
 	TxOpts         *sql.TxOptions
 	Opts           []tx.Option
 	WithTx         func(t *testing.T, ctx context.Context) error
@@ -142,8 +142,8 @@ type runDriverTest struct {
 }
 
 func (w *runDriverTest) Test(t *testing.T) {
-	provider := tx.BeginnerWithDriver(
-		w.ProviderMock(t),
+	beginner := tx.BeginnerWithDriver(
+		w.BeginnerMock(t),
 		w.DriverMock(t),
 	)
 
@@ -155,7 +155,7 @@ func (w *runDriverTest) Test(t *testing.T) {
 	}
 
 	err := tx.Run(ctx,
-		provider,
+		beginner,
 		withTx,
 		w.TxOpts,
 		w.Opts...,
@@ -197,7 +197,7 @@ func Test_Run_Driver(t *testing.T) {
 		{
 			Name:       "success, no driver calls occured",
 			DriverMock: txmocks.NilDriver,
-			ProviderMock: txmocks.ExpectBeginTxAndReturnTx(
+			BeginnerMock: txmocks.ExpectBeginTxAndReturnTx(
 				txmocks.ExpectCommit,
 				nil,
 			),
@@ -211,7 +211,7 @@ func Test_Run_Driver(t *testing.T) {
 				io.ErrUnexpectedEOF,
 				io.ErrUnexpectedEOF,
 			),
-			ProviderMock: txmocks.ExpectBeginTxAndReturnError(
+			BeginnerMock: txmocks.ExpectBeginTxAndReturnError(
 				io.ErrUnexpectedEOF,
 				nil,
 			),
@@ -225,7 +225,7 @@ func Test_Run_Driver(t *testing.T) {
 				io.ErrUnexpectedEOF,
 				io.ErrUnexpectedEOF,
 			),
-			ProviderMock: txmocks.ExpectBeginTxAndReturnTx(
+			BeginnerMock: txmocks.ExpectBeginTxAndReturnTx(
 				txmocks.ExpectRollbackAfterFailedCommit(
 					io.ErrUnexpectedEOF,
 				),
@@ -241,7 +241,7 @@ func Test_Run_Driver(t *testing.T) {
 				io.ErrUnexpectedEOF,
 				io.ErrUnexpectedEOF,
 			),
-			ProviderMock: txmocks.ExpectBeginTxAndReturnTx(
+			BeginnerMock: txmocks.ExpectBeginTxAndReturnTx(
 				txmocks.ExpectRollback(nil),
 				nil,
 			),
@@ -257,7 +257,7 @@ func Test_Run_Driver(t *testing.T) {
 					tx.ErrSerialization,
 				),
 			),
-			ProviderMock: txmocks.JoinProviders(
+			BeginnerMock: txmocks.JoinBeginners(
 				txmocks.ExpectBeginTxAndReturnTx(
 					txmocks.ExpectRollback(nil),
 					nil,
@@ -273,7 +273,7 @@ func Test_Run_Driver(t *testing.T) {
 				io.ErrUnexpectedEOF,
 				tx.ErrSerialization,
 			),
-			ProviderMock: txmocks.ExpectBeginTxAndReturnTx(
+			BeginnerMock: txmocks.ExpectBeginTxAndReturnTx(
 				txmocks.ExpectRollbackAfterFailedCommit(io.ErrUnexpectedEOF),
 				nil,
 			),
@@ -304,7 +304,7 @@ func Test_Run_Driver(t *testing.T) {
 					tx.ErrSerialization,
 				),
 			),
-			ProviderMock: txmocks.JoinProviders(
+			BeginnerMock: txmocks.JoinBeginners(
 				txmocks.ExpectBeginTxAndReturnTx(
 					txmocks.ExpectRollback(nil),
 					txOpts,
@@ -356,7 +356,7 @@ func Test_Run_Driver(t *testing.T) {
 					tx.ErrSerialization,
 				),
 			),
-			ProviderMock: txmocks.JoinProviders(
+			BeginnerMock: txmocks.JoinBeginners(
 				txmocks.ExpectBeginTxAndReturnTx(
 					txmocks.ExpectRollback(nil),
 					txOpts,
@@ -410,7 +410,7 @@ func Test_Run_Driver(t *testing.T) {
 					errors.Join(io.ErrShortWrite, io.ErrUnexpectedEOF),
 				),
 			),
-			ProviderMock: txmocks.JoinProviders(
+			BeginnerMock: txmocks.JoinBeginners(
 				txmocks.ExpectBeginTxAndReturnTx(
 					txmocks.ExpectRollback(nil),
 					txOpts,

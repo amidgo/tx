@@ -23,8 +23,8 @@ type Driver interface {
 	Error(err error) error
 }
 
-func getDriver(provider Beginner) (Driver, bool) {
-	driver, ok := provider.(interface{ Driver() Driver })
+func getDriver(beginner Beginner) (Driver, bool) {
+	driver, ok := beginner.(interface{ Driver() Driver })
 	if !ok {
 		return nil, false
 	}
@@ -41,9 +41,9 @@ func (d *driverBeginner) Driver() Driver {
 	return d.driver
 }
 
-func BeginnerWithDriver(provider Beginner, driver Driver) Beginner {
+func BeginnerWithDriver(beginner Beginner, driver Driver) Beginner {
 	return &driverBeginner{
-		Beginner: provider,
+		Beginner: beginner,
 		driver:   driver,
 	}
 }

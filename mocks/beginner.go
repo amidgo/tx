@@ -21,7 +21,7 @@ type Beginner struct {
 	asrt beginnerAsserter
 }
 
-func newProvider(t testReporter, asrt beginnerAsserter) *Beginner {
+func newBeginner(t testReporter, asrt beginnerAsserter) *Beginner {
 	t.Cleanup(asrt.assert)
 
 	return &Beginner{asrt: asrt}
@@ -45,16 +45,16 @@ func txEnabled(ctx context.Context) bool {
 	return ok
 }
 
-type ProviderMock func(t testReporter) *Beginner
+type BeginnerMock func(t testReporter) *Beginner
 
-func ExpectBeginAndReturnError(beginError error) ProviderMock {
+func ExpectBeginAndReturnError(beginError error) BeginnerMock {
 	return func(t testReporter) *Beginner {
 		asrt := &beginAndReturnError{
 			t:   t,
 			err: beginError,
 		}
 
-		return newProvider(t, asrt)
+		return newBeginner(t, asrt)
 	}
 }
 
@@ -67,14 +67,14 @@ type beginAndReturnError struct {
 func (b *beginAndReturnError) begin(context.Context) (tx.Tx, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
-		b.t.Fatal("unexpected call, provider.Begin called more than once")
+		b.t.Fatal("unexpected call, beginner.Begin called more than once")
 	}
 
 	return nil, b.err
 }
 
 func (b *beginAndReturnError) beginTx(context.Context, *sql.TxOptions) (tx.Tx, error) {
-	b.t.Fatal("unexpected call to provider.BeginTx, expect one call to provider.Begin")
+	b.t.Fatal("unexpected call to beginner.BeginTx, expect one call to beginner.Begin")
 
 	return nil, nil
 }
@@ -82,11 +82,11 @@ func (b *beginAndReturnError) beginTx(context.Context, *sql.TxOptions) (tx.Tx, e
 func (b *beginAndReturnError) assert() {
 	called := b.called.Load()
 	if !called {
-		b.t.Fatal("provider assertion failed, no calls occurred")
+		b.t.Fatal("beginner assertion failed, no calls occurred")
 	}
 }
 
-func ExpectBeginTxAndReturnError(beginError error, expectedOpts *sql.TxOptions) ProviderMock {
+func ExpectBeginTxAndReturnError(beginError error, expectedOpts *sql.TxOptions) BeginnerMock {
 	return func(t testReporter) *Beginner {
 		asrt := &beginTxAndReturnError{
 			t:            t,
@@ -94,7 +94,7 @@ func ExpectBeginTxAndReturnError(beginError error, expectedOpts *sql.TxOptions) 
 			expectedOpts: expectedOpts,
 		}
 
-		return newProvider(t, asrt)
+		return newBeginner(t, asrt)
 	}
 }
 
@@ -106,7 +106,7 @@ type beginTxAndReturnError struct {
 }
 
 func (b *beginTxAndReturnError) begin(context.Context) (tx.Tx, error) {
-	b.t.Fatal("unexpected call to provider.Begin, expect one call to provider.BeginTx")
+	b.t.Fatal("unexpected call to beginner.Begin, expect one call to beginner.BeginTx")
 
 	return nil, nil
 }
@@ -114,7 +114,7 @@ func (b *beginTxAndReturnError) begin(context.Context) (tx.Tx, error) {
 func (b *beginTxAndReturnError) beginTx(_ context.Context, opts *sql.TxOptions) (tx.Tx, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
-		b.t.Fatal("unexpected call, provider.BeginTx called more than once")
+		b.t.Fatal("unexpected call, beginner.BeginTx called more than once")
 	}
 
 	sqlOptsEqual(b.t, b.expectedOpts, opts)
@@ -125,18 +125,18 @@ func (b *beginTxAndReturnError) beginTx(_ context.Context, opts *sql.TxOptions) 
 func (b *beginTxAndReturnError) assert() {
 	called := b.called.Load()
 	if !called {
-		b.t.Fatal("provider assertion failed, no calls occurred")
+		b.t.Fatal("beginner assertion failed, no calls occurred")
 	}
 }
 
-func ExpectBeginAndReturnTx(txMock TxMock) ProviderMock {
+func ExpectBeginAndReturnTx(txMock TxMock) BeginnerMock {
 	return func(t testReporter) *Beginner {
 		asrt := &beginAndReturnTx{
 			t:  t,
 			tx: txMock(t),
 		}
 
-		return newProvider(t, asrt)
+		return newBeginner(t, asrt)
 	}
 }
 
@@ -149,7 +149,7 @@ type beginAndReturnTx struct {
 func (b *beginAndReturnTx) begin(ctx context.Context) (tx.Tx, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
-		b.t.Fatal("unexpected call, provider.Begin called more than once")
+		b.t.Fatal("unexpected call, beginner.Begin called more than once")
 	}
 
 	b.tx.ctx = startTx(ctx)
@@ -158,7 +158,7 @@ func (b *beginAndReturnTx) begin(ctx context.Context) (tx.Tx, error) {
 }
 
 func (b *beginAndReturnTx) beginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, error) {
-	b.t.Fatal("unexpected call to provider.BeginTx, expect one call to provider.Begin")
+	b.t.Fatal("unexpected call to beginner.BeginTx, expect one call to beginner.Begin")
 
 	return nil, nil
 }
@@ -166,11 +166,11 @@ func (b *beginAndReturnTx) beginTx(ctx context.Context, opts *sql.TxOptions) (tx
 func (b *beginAndReturnTx) assert() {
 	called := b.called.Load()
 	if !called {
-		b.t.Fatal("provider assertion failed, no calls occurred")
+		b.t.Fatal("beginner assertion failed, no calls occurred")
 	}
 }
 
-func ExpectBeginTxAndReturnTx(tx TxMock, opts *sql.TxOptions) ProviderMock {
+func ExpectBeginTxAndReturnTx(tx TxMock, opts *sql.TxOptions) BeginnerMock {
 	return func(t testReporter) *Beginner {
 		asrt := &beginTxAndReturnTx{
 			t:            t,
@@ -178,7 +178,7 @@ func ExpectBeginTxAndReturnTx(tx TxMock, opts *sql.TxOptions) ProviderMock {
 			expectedOpts: opts,
 		}
 
-		return newProvider(t, asrt)
+		return newBeginner(t, asrt)
 	}
 }
 
@@ -190,7 +190,7 @@ type beginTxAndReturnTx struct {
 }
 
 func (b *beginTxAndReturnTx) begin(context.Context) (tx.Tx, error) {
-	b.t.Fatal("unexpected call to provider.Begin, expect one call to provider.BeginTx")
+	b.t.Fatal("unexpected call to beginner.Begin, expect one call to beginner.BeginTx")
 
 	return nil, nil
 }
@@ -198,7 +198,7 @@ func (b *beginTxAndReturnTx) begin(context.Context) (tx.Tx, error) {
 func (b *beginTxAndReturnTx) beginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, error) {
 	swapped := b.called.CompareAndSwap(false, true)
 	if !swapped {
-		b.t.Fatal("unexpected call, provider.BeginTx called more than once")
+		b.t.Fatal("unexpected call, beginner.BeginTx called more than once")
 	}
 
 	sqlOptsEqual(b.t, b.expectedOpts, opts)
@@ -211,7 +211,7 @@ func (b *beginTxAndReturnTx) beginTx(ctx context.Context, opts *sql.TxOptions) (
 func (b *beginTxAndReturnTx) assert() {
 	called := b.called.Load()
 	if !called {
-		b.t.Fatal("provider assertion failed, no calls occurred")
+		b.t.Fatal("beginner assertion failed, no calls occurred")
 	}
 }
 
@@ -237,29 +237,29 @@ func sqlOptsEqual(t testReporter, expected, actual *sql.TxOptions) {
 }
 
 func tFatalUnexpectedOpts(t testReporter, expected, actual *sql.TxOptions) {
-	t.Fatalf("unexpected call, call provider.BeginTx with %+v opts, expected %+v", actual, expected)
+	t.Fatalf("unexpected call, call beginner.BeginTx with %+v opts, expected %+v", actual, expected)
 }
 
-func JoinProviders(providers ...ProviderMock) ProviderMock {
+func JoinBeginners(beginners ...BeginnerMock) BeginnerMock {
 	return func(t testReporter) *Beginner {
-		switch len(providers) {
+		switch len(beginners) {
 		case 0:
-			t.Fatal("empty join provider templates")
+			t.Fatal("empty join beginner templates")
 
 			return nil
 		case 1:
-			return providers[0](t)
+			return beginners[0](t)
 		}
 
-		asrts := make([]beginnerAsserter, len(providers))
+		asrts := make([]beginnerAsserter, len(beginners))
 
-		for i := range providers {
-			index := len(providers) - 1 - i
+		for i := range beginners {
+			index := len(beginners) - 1 - i
 
-			prv := providers[index](t)
+			prv := beginners[index](t)
 
 			if prv.asrt == nil {
-				t.Fatalf("invalid provider by index %d, Provider.asrt is nil", index)
+				t.Fatalf("invalid beginner by index %d, Beginner.asrt is nil", index)
 
 				return nil
 			}
@@ -267,29 +267,29 @@ func JoinProviders(providers ...ProviderMock) ProviderMock {
 			asrts[index] = prv.asrt
 		}
 
-		asrt := &providerAsserterJoin{
+		asrt := &beginnerAsserterJoin{
 			t:     t,
 			asrts: asrts,
 		}
 
-		return newProvider(t, asrt)
+		return newBeginner(t, asrt)
 	}
 }
 
-type providerAsserterJoin struct {
+type beginnerAsserterJoin struct {
 	t            testReporter
 	asrts        []beginnerAsserter
 	currentIndex int
 	mu           sync.Mutex
 }
 
-func (p *providerAsserterJoin) begin(ctx context.Context) (tx.Tx, error) {
+func (p *beginnerAsserterJoin) begin(ctx context.Context) (tx.Tx, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	asrt, expected := p.currentAsserter()
 	if !expected {
-		p.t.Fatal("unexpected call to provider.Begin, no calls left")
+		p.t.Fatal("unexpected call to beginner.Begin, no calls left")
 
 		return nil, nil
 	}
@@ -301,13 +301,13 @@ func (p *providerAsserterJoin) begin(ctx context.Context) (tx.Tx, error) {
 	return tx, err
 }
 
-func (p *providerAsserterJoin) beginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, error) {
+func (p *beginnerAsserterJoin) beginTx(ctx context.Context, opts *sql.TxOptions) (tx.Tx, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	asrt, expected := p.currentAsserter()
 	if !expected {
-		p.t.Fatal("unexpected call to provider.BeginTx, no calls left")
+		p.t.Fatal("unexpected call to beginner.BeginTx, no calls left")
 
 		return nil, nil
 	}
@@ -319,13 +319,13 @@ func (p *providerAsserterJoin) beginTx(ctx context.Context, opts *sql.TxOptions)
 	return tx, err
 }
 
-func (p *providerAsserterJoin) assert() {
+func (p *beginnerAsserterJoin) assert() {
 	for _, asrt := range p.asrts {
 		asrt.assert()
 	}
 }
 
-func (p *providerAsserterJoin) currentAsserter() (beginnerAsserter, bool) {
+func (p *beginnerAsserterJoin) currentAsserter() (beginnerAsserter, bool) {
 	if p.currentIndex > len(p.asrts)-1 {
 		return nil, false
 	}

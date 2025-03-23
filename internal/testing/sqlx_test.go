@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_SqlxProvider_Begin_BeginTx(t *testing.T) {
+func Test_SqlxBeginner_Begin_BeginTx(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -22,29 +22,29 @@ func Test_SqlxProvider_Begin_BeginTx(t *testing.T) {
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := sqlxtx.NewBeginner(sqlxDB)
+	beginner := sqlxtx.NewBeginner(sqlxDB)
 
-	tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
+	tx, err := beginner.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	require.NoError(t, err)
 
-	assertSqlxTransactionEnabled(t, provider, tx, "serializable", false)
+	assertSqlxTransactionEnabled(t, beginner, tx, "serializable", false)
 
-	tx, err = provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	tx, err = beginner.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	require.NoError(t, err)
 
-	assertSqlxTransactionEnabled(t, provider, tx, "repeatable read", true)
+	assertSqlxTransactionEnabled(t, beginner, tx, "repeatable read", true)
 
-	tx, err = provider.Begin(ctx)
+	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertSqlxTransactionEnabled(t, provider, tx, "read committed", false)
+	assertSqlxTransactionEnabled(t, beginner, tx, "read committed", false)
 }
 
-func assertSqlxTransactionEnabled(t *testing.T, provider *sqlxtx.Beginner, tx tx.Tx, expectedIsolationLevel string, readOnly bool) {
-	enabled := provider.TxEnabled(tx.Context())
+func assertSqlxTransactionEnabled(t *testing.T, beginner *sqlxtx.Beginner, tx tx.Tx, expectedIsolationLevel string, readOnly bool) {
+	enabled := beginner.TxEnabled(tx.Context())
 	require.True(t, enabled)
 
-	exec := provider.Executor(tx.Context())
+	exec := beginner.Executor(tx.Context())
 	_, ok := exec.(*sqlx.Tx)
 	require.True(t, ok)
 
@@ -53,11 +53,11 @@ func assertSqlxTransactionEnabled(t *testing.T, provider *sqlxtx.Beginner, tx tx
 	err := tx.Rollback()
 	require.NoError(t, err)
 
-	enabled = provider.TxEnabled(tx.Context())
+	enabled = beginner.TxEnabled(tx.Context())
 	require.False(t, enabled)
 }
 
-func Test_SqlxProvider_Rollback_Commit(t *testing.T) {
+func Test_SqlxBeginner_Rollback_Commit(t *testing.T) {
 	t.Parallel()
 
 	const createUsersTableQuery = `
@@ -73,32 +73,32 @@ func Test_SqlxProvider_Rollback_Commit(t *testing.T) {
 
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := sqlxtx.NewBeginner(sqlxDB)
+	beginner := sqlxtx.NewBeginner(sqlxDB)
 
-	tx, err := provider.Begin(ctx)
+	tx, err := beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
-	tx, err = provider.Begin(ctx)
+	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
-	tx, err = provider.BeginTx(ctx, opts)
+	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
-	tx, err = provider.BeginTx(ctx, opts)
+	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 }
 
-func Test_SqlxProvider_WithTx(t *testing.T) {
+func Test_SqlxBeginner_WithTx(t *testing.T) {
 	t.Parallel()
 
 	const createUsersTableQuery = `
@@ -114,7 +114,7 @@ func Test_SqlxProvider_WithTx(t *testing.T) {
 
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
-	provider := sqlxtx.NewBeginner(sqlxDB)
+	beginner := sqlxtx.NewBeginner(sqlxDB)
 
 	t.Run("no external tx, execution failed, rollback expected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -122,7 +122,7 @@ func Test_SqlxProvider_WithTx(t *testing.T) {
 
 		userID := uuid.New()
 
-		err := provider.WithTx(ctx,
+		err := beginner.WithTx(ctx,
 			func(ctx context.Context, exec sqlxtx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, 100)
 				require.NoError(t, err)
@@ -145,7 +145,7 @@ func Test_SqlxProvider_WithTx(t *testing.T) {
 		userID := uuid.New()
 		userAge := 100
 
-		err := provider.WithTx(ctx,
+		err := beginner.WithTx(ctx,
 			func(ctx context.Context, exec sqlxtx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
 				require.NoError(t, err)

@@ -2,11 +2,11 @@ package tx
 
 import "testing"
 
-func Test_driverProvider(t *testing.T) {
-	provider := &driverBeginner{}
+func Test_driverBeginner(t *testing.T) {
+	beginner := &driverBeginner{}
 
-	_, ok := getDriver(provider)
+	_, ok := getDriver(beginner)
 	if !ok {
-		t.Fatal("driver provider doesn't implements Driver() Driver method")
+		t.Fatal("driver beginner doesn't implements Driver() Driver method")
 	}
 }

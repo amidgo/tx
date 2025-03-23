@@ -16,7 +16,7 @@ import (
 	buntx "github.com/amidgo/tx/bun"
 )
 
-func Test_BunProvider_Begin_BeginTx(t *testing.T) {
+func Test_BunBeginner_Begin_BeginTx(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -25,29 +25,29 @@ func Test_BunProvider_Begin_BeginTx(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := buntx.NewBeginner(bunDB)
+	beginner := buntx.NewBeginner(bunDB)
 
-	exec := provider.Executor(ctx)
+	exec := beginner.Executor(ctx)
 	_, ok := exec.(*bun.DB)
 	require.True(t, ok)
 
-	tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
+	tx, err := beginner.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	require.NoError(t, err)
 
-	assertBunTransactionEnabled(t, provider, tx, "serializable", false)
+	assertBunTransactionEnabled(t, beginner, tx, "serializable", false)
 
-	tx, err = provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	tx, err = beginner.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	require.NoError(t, err)
 
-	assertBunTransactionEnabled(t, provider, tx, "repeatable read", true)
+	assertBunTransactionEnabled(t, beginner, tx, "repeatable read", true)
 
-	tx, err = provider.Begin(ctx)
+	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertBunTransactionEnabled(t, provider, tx, "read committed", false)
+	assertBunTransactionEnabled(t, beginner, tx, "read committed", false)
 }
 
-func Test_BunProvider_Rollback_Commit(t *testing.T) {
+func Test_BunBeginner_Rollback_Commit(t *testing.T) {
 	t.Parallel()
 
 	const createUsersTableQuery = `
@@ -63,32 +63,32 @@ func Test_BunProvider_Rollback_Commit(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := buntx.NewBeginner(bunDB)
+	beginner := buntx.NewBeginner(bunDB)
 
-	tx, err := provider.Begin(ctx)
+	tx, err := beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertBunTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertBunTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
-	tx, err = provider.Begin(ctx)
+	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertBunTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertBunTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
-	tx, err = provider.BeginTx(ctx, opts)
+	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertBunTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertBunTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
-	tx, err = provider.BeginTx(ctx, opts)
+	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertBunTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertBunTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 }
 
-func Test_BunProvider_WithTx(t *testing.T) {
+func Test_BunBeginner(t *testing.T) {
 	t.Parallel()
 
 	const createUsersTableQuery = `
@@ -104,7 +104,7 @@ func Test_BunProvider_WithTx(t *testing.T) {
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
-	provider := buntx.NewBeginner(bunDB)
+	beginner := buntx.NewBeginner(bunDB)
 
 	t.Run("no external tx, execution failed, rollback expected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -112,7 +112,7 @@ func Test_BunProvider_WithTx(t *testing.T) {
 
 		userID := uuid.New()
 
-		err := provider.WithTx(ctx,
+		err := beginner.WithTx(ctx,
 			func(ctx context.Context, exec buntx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES (?, ?)", userID, 100)
 				require.NoError(t, err)
@@ -135,7 +135,7 @@ func Test_BunProvider_WithTx(t *testing.T) {
 		userID := uuid.New()
 		userAge := 100
 
-		err := provider.WithTx(ctx,
+		err := beginner.WithTx(ctx,
 			func(ctx context.Context, exec buntx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES (?, ?)", userID, userAge)
 				require.NoError(t, err)
@@ -152,11 +152,11 @@ func Test_BunProvider_WithTx(t *testing.T) {
 	})
 }
 
-func assertBunTransactionEnabled(t *testing.T, provider *buntx.Beginner, tx tx.Tx, expectedIsolationLevel string, readOnly bool) {
-	enabled := provider.TxEnabled(tx.Context())
+func assertBunTransactionEnabled(t *testing.T, beginner *buntx.Beginner, tx tx.Tx, expectedIsolationLevel string, readOnly bool) {
+	enabled := beginner.TxEnabled(tx.Context())
 	require.True(t, enabled)
 
-	exec := provider.Executor(tx.Context())
+	exec := beginner.Executor(tx.Context())
 	_, ok := exec.(bun.Tx)
 	require.True(t, ok)
 
@@ -165,6 +165,6 @@ func assertBunTransactionEnabled(t *testing.T, provider *buntx.Beginner, tx tx.T
 	err := tx.Rollback()
 	require.NoError(t, err)
 
-	enabled = provider.TxEnabled(tx.Context())
+	enabled = beginner.TxEnabled(tx.Context())
 	require.False(t, enabled)
 }

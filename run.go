@@ -97,7 +97,7 @@ var errRepeatTimesExcedeed = errors.New("repeat times exceeded")
 func retry(
 	ctx context.Context,
 	driver Driver,
-	provider Beginner,
+	beginner Beginner,
 	withTx func(ctx context.Context) error,
 	txOpts *sql.TxOptions,
 	repeatTimes int,
@@ -106,7 +106,7 @@ func retry(
 		return errRepeatTimesExcedeed
 	}
 
-	tx, err := provider.BeginTx(ctx, txOpts)
+	tx, err := beginner.BeginTx(ctx, txOpts)
 
 	err = driverError(driver, err)
 	if err != nil {
@@ -132,7 +132,7 @@ func retry(
 		_ = tx.Rollback()
 		repeatTimes--
 
-		retryErr := retry(ctx, driver, provider, withTx, txOpts, repeatTimes)
+		retryErr := retry(ctx, driver, beginner, withTx, txOpts, repeatTimes)
 		if retryErr != nil {
 			return retryErr
 		}
@@ -151,7 +151,7 @@ func retry(
 		_ = tx.Rollback()
 		repeatTimes--
 
-		retryErr := retry(ctx, driver, provider, withTx, txOpts, repeatTimes)
+		retryErr := retry(ctx, driver, beginner, withTx, txOpts, repeatTimes)
 		if retryErr != nil {
 			return retryErr
 		}

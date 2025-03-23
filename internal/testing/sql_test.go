@@ -13,46 +13,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_SQLProvider_Begin_BeginTx(t *testing.T) {
+func Test_SQLBeginner_Begin_BeginTx(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
 
-	provider := sqltx.NewBeginner(db)
+	beginner := sqltx.NewBeginner(db)
 
-	exec := provider.Executor(ctx)
+	exec := beginner.Executor(ctx)
 	_, ok := exec.(*sql.DB)
 	require.True(t, ok)
 
-	tx, err := provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
+	tx, err := beginner.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	require.NoError(t, err)
 
-	assertSQLTransactionEnabled(t, provider, tx, "serializable", false)
+	assertSQLTransactionEnabled(t, beginner, tx, "serializable", false)
 
-	tx, err = provider.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	tx, err = beginner.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	require.NoError(t, err)
 
-	assertSQLTransactionEnabled(t, provider, tx, "repeatable read", true)
+	assertSQLTransactionEnabled(t, beginner, tx, "repeatable read", true)
 
-	tx, err = provider.Begin(ctx)
+	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertSQLTransactionEnabled(t, provider, tx, "read committed", false)
+	assertSQLTransactionEnabled(t, beginner, tx, "read committed", false)
 }
 
 func assertSQLTransactionEnabled(
 	t *testing.T,
-	provider *sqltx.Beginner,
+	beginner *sqltx.Beginner,
 	tx tx.Tx,
 	expectedIsolationLevel string,
 	readOnly bool,
 ) {
-	enabled := provider.TxEnabled(tx.Context())
+	enabled := beginner.TxEnabled(tx.Context())
 	require.True(t, enabled)
 
-	exec := provider.Executor(tx.Context())
+	exec := beginner.Executor(tx.Context())
 	_, ok := exec.(*sql.Tx)
 	require.True(t, ok)
 
@@ -61,7 +61,7 @@ func assertSQLTransactionEnabled(
 	err := tx.Rollback()
 	require.NoError(t, err)
 
-	enabled = provider.TxEnabled(tx.Context())
+	enabled = beginner.TxEnabled(tx.Context())
 	require.False(t, enabled)
 }
 
@@ -81,7 +81,7 @@ func assertSQLTransactionLevel(t *testing.T, exec executor, expectedIsolationLev
 	require.Equal(t, readOnly, txReadOnly.readOnly)
 }
 
-func Test_SQLProvider_Rollback_Commit(t *testing.T) {
+func Test_SQLBeginner_Rollback_Commit(t *testing.T) {
 	t.Parallel()
 
 	const createUsersTableQuery = `
@@ -95,32 +95,32 @@ func Test_SQLProvider_Rollback_Commit(t *testing.T) {
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
 
-	provider := sqltx.NewBeginner(db)
+	beginner := sqltx.NewBeginner(db)
 
-	tx, err := provider.Begin(ctx)
+	tx, err := beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
-	tx, err = provider.Begin(ctx)
+	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
-	tx, err = provider.BeginTx(ctx, opts)
+	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertTxCommit(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
-	tx, err = provider.BeginTx(ctx, opts)
+	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertTxRollback(t, provider, provider.Executor(tx.Context()), tx, db)
+	assertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 }
 
-func Test_SQLProvider_WithTx(t *testing.T) {
+func Test_SQLBeginner_WithTx(t *testing.T) {
 	t.Parallel()
 
 	const createUsersTableQuery = `
@@ -134,7 +134,7 @@ func Test_SQLProvider_WithTx(t *testing.T) {
 
 	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
 
-	provider := sqltx.NewBeginner(db)
+	beginner := sqltx.NewBeginner(db)
 
 	t.Run("no external tx, execution failed, rollback expected", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -142,7 +142,7 @@ func Test_SQLProvider_WithTx(t *testing.T) {
 
 		userID := uuid.New()
 
-		err := provider.WithTx(ctx,
+		err := beginner.WithTx(ctx,
 			func(ctx context.Context, exec sqltx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, 100)
 				require.NoError(t, err)
@@ -165,7 +165,7 @@ func Test_SQLProvider_WithTx(t *testing.T) {
 		userID := uuid.New()
 		userAge := 100
 
-		err := provider.WithTx(ctx,
+		err := beginner.WithTx(ctx,
 			func(ctx context.Context, exec sqltx.Executor) error {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
 				require.NoError(t, err)
