@@ -12,27 +12,37 @@ import (
 )
 
 type runTest struct {
-	Name          string
-	Beginner      txmocks.BeginnerMock
-	WithTx        func(t *testing.T, ctx context.Context) error
-	Opts          *sql.TxOptions
-	ExpectedError error
+	Name           string
+	Beginner       txmocks.BeginnerMock
+	WithTx         func(t *testing.T, ctx context.Context) error
+	Opts           *sql.TxOptions
+	ExpectedErrors []error
 }
 
 func (w *runTest) Test(t *testing.T) {
 	beginner := w.Beginner(t)
 	defer func() {
-		err := recover()
-		if err == nil {
+		recover := recover()
+		if recover == nil {
 			return
 		}
 
-		if !errors.Is(err.(error), w.ExpectedError) {
-			t.Fatalf(
-				"unexpected error from panic recover, expected %+v, actual %+v",
-				w.ExpectedError,
-				err,
-			)
+		err := recover.(error)
+
+		if len(w.ExpectedErrors) == 0 {
+			if err != nil {
+				t.Fatalf("unexpected error, %s", err)
+			}
+		}
+
+		for _, expectedErr := range w.ExpectedErrors {
+			if !errors.Is(err, expectedErr) {
+				t.Fatalf(
+					"unexpected error from panic recover, expected %+v, actual %+v",
+					expectedErr,
+					err,
+				)
+			}
 		}
 	}()
 
@@ -49,13 +59,21 @@ func (w *runTest) Test(t *testing.T) {
 		withTx,
 		w.Opts,
 	)
-	if !errors.Is(err, w.ExpectedError) {
-		t.Fatalf(
-			"unexpected error from tx.Run, expected %+v, actual %+v",
-			w.ExpectedError,
-			err,
-		)
+
+	if len(w.ExpectedErrors) == 0 && err != nil {
+		t.Fatalf("unexpected error, %s", err)
 	}
+
+	for _, expectedErr := range w.ExpectedErrors {
+		if !errors.Is(err, expectedErr) {
+			t.Fatalf(
+				"unexpected error from tx.Run, expected %+v, actual %+v",
+				expectedErr,
+				err,
+			)
+		}
+	}
+
 }
 
 func Test_Run(t *testing.T) {
@@ -72,10 +90,10 @@ func Test_Run(t *testing.T) {
 
 	tests := []*runTest{
 		{
-			Name:          "failed begin tx",
-			Beginner:      txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
-			Opts:          opts,
-			ExpectedError: errBeginTx,
+			Name:           "failed begin tx",
+			Beginner:       txmocks.ExpectBeginTxAndReturnError(errBeginTx, opts),
+			Opts:           opts,
+			ExpectedErrors: []error{tx.ErrBeginTx, errBeginTx},
 		},
 		{
 			Name:     "with tx returned error",
@@ -85,8 +103,8 @@ func Test_Run(t *testing.T) {
 
 				return errWithTx
 			},
-			Opts:          opts,
-			ExpectedError: errWithTx,
+			Opts:           opts,
+			ExpectedErrors: []error{errWithTx},
 		},
 		{
 			Name:     "with tx paniced",
@@ -96,8 +114,8 @@ func Test_Run(t *testing.T) {
 
 				panic(errWithTx)
 			},
-			Opts:          opts,
-			ExpectedError: errWithTx,
+			Opts:           opts,
+			ExpectedErrors: []error{errWithTx},
 		},
 		{
 			Name: "commit returned error",
@@ -110,8 +128,8 @@ func Test_Run(t *testing.T) {
 
 				return nil
 			},
-			Opts:          opts,
-			ExpectedError: errCommit,
+			Opts:           opts,
+			ExpectedErrors: []error{tx.ErrCommit, errCommit},
 		},
 		{
 			Name:     "commit success",
@@ -121,8 +139,7 @@ func Test_Run(t *testing.T) {
 
 				return nil
 			},
-			Opts:          opts,
-			ExpectedError: nil,
+			Opts: opts,
 		},
 	}
 
@@ -132,13 +149,14 @@ func Test_Run(t *testing.T) {
 }
 
 type runDriverTest struct {
-	Name           string
-	DriverMock     txmocks.DriverMock
-	BeginnerMock   txmocks.BeginnerMock
-	TxOpts         *sql.TxOptions
-	Opts           []tx.Option
-	WithTx         func(t *testing.T, ctx context.Context) error
-	ExpectedErrors []error
+	Name             string
+	DriverMock       txmocks.DriverMock
+	BeginnerMock     txmocks.BeginnerMock
+	TxOpts           *sql.TxOptions
+	Opts             []tx.Option
+	WithTx           func(t *testing.T, ctx context.Context) error
+	ExpectedErrors   []error
+	UnexpectedErrors []error
 }
 
 func (w *runDriverTest) Test(t *testing.T) {
@@ -168,6 +186,12 @@ func (w *runDriverTest) Test(t *testing.T) {
 	for _, expectedErr := range w.ExpectedErrors {
 		if !errors.Is(err, expectedErr) {
 			t.Fatalf("unexpected error, expect %+v, actual %+v", expectedErr, err)
+		}
+	}
+
+	for _, unexpectedErr := range w.UnexpectedErrors {
+		if errors.Is(err, unexpectedErr) {
+			t.Fatalf("unexpected error, unexpect %+v, actual %+v", unexpectedErr, err)
 		}
 	}
 }
@@ -215,8 +239,9 @@ func Test_Run_Driver(t *testing.T) {
 				io.ErrUnexpectedEOF,
 				nil,
 			),
-			WithTx:         func(t *testing.T, ctx context.Context) error { return nil },
-			ExpectedErrors: []error{io.ErrUnexpectedEOF},
+			WithTx:           func(t *testing.T, ctx context.Context) error { return nil },
+			ExpectedErrors:   []error{tx.ErrBeginTx, io.ErrUnexpectedEOF},
+			UnexpectedErrors: []error{tx.ErrCommit},
 		},
 		{
 			Name: "failed commit tx",
@@ -231,8 +256,9 @@ func Test_Run_Driver(t *testing.T) {
 				),
 				nil,
 			),
-			WithTx:         func(t *testing.T, ctx context.Context) error { return nil },
-			ExpectedErrors: []error{io.ErrUnexpectedEOF},
+			WithTx:           func(t *testing.T, ctx context.Context) error { return nil },
+			ExpectedErrors:   []error{tx.ErrCommit, io.ErrUnexpectedEOF},
+			UnexpectedErrors: []error{tx.ErrBeginTx},
 		},
 		{
 			Name: "failed withTx",
@@ -245,8 +271,9 @@ func Test_Run_Driver(t *testing.T) {
 				txmocks.ExpectRollback(nil),
 				nil,
 			),
-			WithTx:         withTx(1, io.ErrUnexpectedEOF),
-			ExpectedErrors: []error{io.ErrUnexpectedEOF},
+			WithTx:           withTx(1, io.ErrUnexpectedEOF),
+			ExpectedErrors:   []error{io.ErrUnexpectedEOF},
+			UnexpectedErrors: []error{tx.ErrCommit, tx.ErrCommit},
 		},
 		{
 			Name: "failed withTx, serialization error, but no opts provided",
@@ -263,8 +290,9 @@ func Test_Run_Driver(t *testing.T) {
 					nil,
 				),
 			),
-			WithTx:         withTx(1, io.ErrUnexpectedEOF),
-			ExpectedErrors: []error{tx.ErrSerialization},
+			WithTx:           withTx(1, io.ErrUnexpectedEOF),
+			ExpectedErrors:   []error{tx.ErrSerialization},
+			UnexpectedErrors: []error{tx.ErrCommit, tx.ErrCommit},
 		},
 		{
 			Name: "failed commit, serialization error, but no opts provided",
@@ -277,8 +305,9 @@ func Test_Run_Driver(t *testing.T) {
 				txmocks.ExpectRollbackAfterFailedCommit(io.ErrUnexpectedEOF),
 				nil,
 			),
-			WithTx:         func(t *testing.T, ctx context.Context) error { return nil },
-			ExpectedErrors: []error{tx.ErrSerialization},
+			WithTx:           func(t *testing.T, ctx context.Context) error { return nil },
+			ExpectedErrors:   []error{tx.ErrCommit, tx.ErrSerialization},
+			UnexpectedErrors: []error{tx.ErrBeginTx},
 		},
 		{
 			Name: "serialization error, opts provided, endless retry",
@@ -379,7 +408,8 @@ func Test_Run_Driver(t *testing.T) {
 			Opts: []tx.Option{
 				tx.RetrySerialization(3),
 			},
-			ExpectedErrors: []error{tx.ErrSerialization},
+			ExpectedErrors:   []error{tx.ErrCommit, tx.ErrSerialization},
+			UnexpectedErrors: []error{tx.ErrBeginTx},
 		},
 		{
 			Name: "serialization error, opts provided, endless retry, beginTx failed",
@@ -434,7 +464,8 @@ func Test_Run_Driver(t *testing.T) {
 			Opts: []tx.Option{
 				tx.RetrySerialization(-1),
 			},
-			ExpectedErrors: []error{io.ErrShortWrite, io.ErrUnexpectedEOF},
+			ExpectedErrors:   []error{tx.ErrBeginTx, io.ErrShortWrite, io.ErrUnexpectedEOF},
+			UnexpectedErrors: []error{tx.ErrCommit},
 		},
 	}
 

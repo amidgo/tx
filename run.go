@@ -38,7 +38,7 @@ func Run(
 
 	err = driverError(driver, err)
 	if err != nil {
-		return fmt.Errorf("begin tx, %w", err)
+		return errors.Join(ErrBeginTx, err)
 	}
 
 	finished := false
@@ -84,7 +84,7 @@ func Run(
 
 		return nil
 	case err != nil:
-		return err
+		return errors.Join(ErrCommit, err)
 	}
 
 	finished = true
@@ -110,7 +110,7 @@ func retry(
 
 	err = driverError(driver, err)
 	if err != nil {
-		return err
+		return errors.Join(ErrBeginTx, err)
 	}
 
 	finished := false
@@ -152,13 +152,17 @@ func retry(
 		repeatTimes--
 
 		retryErr := retry(ctx, driver, beginner, withTx, txOpts, repeatTimes)
+		if errors.Is(retryErr, errRepeatTimesExcedeed) {
+			retryErr = errors.Join(ErrCommit, retryErr)
+		}
+
 		if retryErr != nil {
 			return retryErr
 		}
 
 		return nil
 	case err != nil:
-		return err
+		return errors.Join(ErrCommit, err)
 	}
 
 	finished = true

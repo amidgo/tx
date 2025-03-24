@@ -6,7 +6,11 @@ import (
 	"errors"
 )
 
-var ErrSerialization = errors.New("serialization error")
+var (
+	ErrSerialization = errors.New("serialization error")
+	ErrCommit        = errors.New("commit error")
+	ErrBeginTx       = errors.New("begin tx error")
+)
 
 type Tx interface {
 	Context() context.Context
