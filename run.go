@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 )
 
 type options struct {
@@ -19,6 +18,139 @@ func RetrySerialization(times int) Option {
 	}
 }
 
+func txPipelineExec(
+	ctx context.Context,
+	beginner Beginner,
+	withTx func(txContext context.Context) error,
+	txOpts *sql.TxOptions,
+	opts ...Option,
+) func() error {
+	pipeline := makeTxPipeline(ctx, beginner, withTx, txOpts)
+
+	driver, _ := getDriver(beginner)
+
+	if driver != nil {
+		pipeline = useDriverToTxPipeline(pipeline, driver)
+	}
+
+	exec := pipeline.exec()
+
+	options := &options{}
+
+	for _, op := range opts {
+		op(options)
+	}
+
+	if options.serializationRetryCount != 0 {
+		exec = retrySerializationExec(exec, options.serializationRetryCount)
+	}
+
+	return exec
+}
+
+func retrySerializationExec(exec func() error, serializationRetryCount int) func() error {
+	return func() error {
+		err := exec()
+		if !errors.Is(err, ErrSerialization) {
+			return err
+		}
+
+		for i := serializationRetryCount; i != 0; i-- {
+			err = exec()
+
+			if errors.Is(err, ErrSerialization) {
+				continue
+			}
+
+			return err
+		}
+
+		return errors.Join(errSerializationRepeatTimesExcedeed, err)
+	}
+}
+
+func useDriverToTxPipeline(pipeline txPipeline, driver Driver) txPipeline {
+	return txPipeline{
+		begin: func() (Tx, error) {
+			tx, err := pipeline.begin()
+			err = driverError(driver, err)
+
+			return tx, err
+		},
+		withTx: func(txContext context.Context) error {
+			err := pipeline.withTx(txContext)
+
+			return driverError(driver, err)
+		},
+		commit: func(tx Tx) error {
+			err := pipeline.commit(tx)
+
+			return driverError(driver, err)
+		},
+		rollback: pipeline.rollback,
+	}
+}
+
+func makeTxPipeline(
+	ctx context.Context,
+	beginner Beginner,
+	withTx func(txContext context.Context) error,
+	txOpts *sql.TxOptions,
+) txPipeline {
+	return txPipeline{
+		begin: func() (Tx, error) {
+			return beginner.BeginTx(ctx, txOpts)
+		},
+		withTx: withTx,
+		commit: func(tx Tx) error {
+			return tx.Commit()
+		},
+		rollback: func(tx Tx) {
+			_ = tx.Rollback()
+		},
+	}
+}
+
+type txPipeline struct {
+	begin    func() (Tx, error)
+	withTx   func(txContext context.Context) error
+	commit   func(tx Tx) error
+	rollback func(tx Tx)
+}
+
+func (t txPipeline) exec() func() error {
+	return func() error {
+		tx, err := t.begin()
+		if err != nil {
+			return errors.Join(ErrBeginTx, err)
+		}
+
+		committed := false
+
+		defer func() {
+			if committed {
+				return
+			}
+
+			t.rollback(tx)
+		}()
+
+		err = t.withTx(tx.Context())
+		if err != nil {
+			return err
+		}
+
+		err = t.commit(tx)
+		if err != nil {
+			return errors.Join(ErrCommit, err)
+		}
+
+		committed = true
+
+		return nil
+	}
+}
+
 func Run(
 	ctx context.Context,
 	beginner Beginner,
@@ -26,149 +158,18 @@ func Run(
 	txOpts *sql.TxOptions,
 	opts ...Option,
 ) error {
-	options := &options{}
+	exec := txPipelineExec(
+		ctx,
+		beginner,
+		withTx,
+		txOpts,
+		opts...,
+	)
 
-	for _, op := range opts {
-		op(options)
-	}
-
-	driver, _ := getDriver(beginner)
-
-	tx, err := beginner.BeginTx(ctx, txOpts)
-
-	err = driverError(driver, err)
-	if err != nil {
-		return errors.Join(ErrBeginTx, err)
-	}
-
-	finished := false
-
-	defer func() {
-		if finished {
-			return
-		}
-
-		_ = tx.Rollback()
-	}()
-
-	err = withTx(tx.Context())
-	err = driverError(driver, err)
-
-	switch {
-	case options.serializationRetryCount != 0 && errors.Is(err, ErrSerialization):
-		finished = true
-		_ = tx.Rollback()
-
-		retryErr := retry(ctx, driver, beginner, withTx, txOpts, options.serializationRetryCount)
-		if retryErr != nil {
-			return fmt.Errorf("retry %w, %w, after %d retries", err, retryErr, options.serializationRetryCount)
-		}
-
-		return nil
-	case err != nil:
-		return err
-	}
-
-	err = tx.Commit()
-	err = driverError(driver, err)
-
-	switch {
-	case options.serializationRetryCount != 0 && errors.Is(err, ErrSerialization):
-		finished = true
-		_ = tx.Rollback()
-
-		retryErr := retry(ctx, driver, beginner, withTx, txOpts, options.serializationRetryCount)
-		if retryErr != nil {
-			return fmt.Errorf("retry %w, %w, after %d retries", err, retryErr, options.serializationRetryCount)
-		}
-
-		return nil
-	case err != nil:
-		return errors.Join(ErrCommit, err)
-	}
-
-	finished = true
-
-	return nil
+	return exec()
 }
 
-var errRepeatTimesExcedeed = errors.New("repeat times exceeded")
-
-func retry(
-	ctx context.Context,
-	driver Driver,
-	beginner Beginner,
-	withTx func(ctx context.Context) error,
-	txOpts *sql.TxOptions,
-	repeatTimes int,
-) error {
-	if repeatTimes == 0 {
-		return errRepeatTimesExcedeed
-	}
-
-	tx, err := beginner.BeginTx(ctx, txOpts)
-
-	err = driverError(driver, err)
-	if err != nil {
-		return errors.Join(ErrBeginTx, err)
-	}
-
-	finished := false
-
-	defer func() {
-		if finished {
-			return
-		}
-
-		_ = tx.Rollback()
-	}()
-
-	err = withTx(tx.Context())
-	err = driverError(driver, err)
-
-	switch {
-	case errors.Is(err, ErrSerialization):
-		finished = true
-		_ = tx.Rollback()
-		repeatTimes--
-
-		retryErr := retry(ctx, driver, beginner, withTx, txOpts, repeatTimes)
-		if retryErr != nil {
-			return retryErr
-		}
-
-		return nil
-	case err != nil:
-		return err
-	}
-
-	err = tx.Commit()
-	err = driverError(driver, err)
-
-	switch {
-	case errors.Is(err, ErrSerialization):
-		finished = true
-		_ = tx.Rollback()
-		repeatTimes--
-
-		retryErr := retry(ctx, driver, beginner, withTx, txOpts, repeatTimes)
-		if errors.Is(retryErr, errRepeatTimesExcedeed) {
-			retryErr = errors.Join(ErrCommit, retryErr)
-		}
-
-		if retryErr != nil {
-			return retryErr
-		}
-
-		return nil
-	case err != nil:
-		return errors.Join(ErrCommit, err)
-	}
-
-	finished = true
-
-	return nil
-}
+var errSerializationRepeatTimesExcedeed = errors.New("serialization repeat times exceeded")
 
 func driverError(driver Driver, err error) error {
 	if err == nil {
