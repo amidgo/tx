@@ -332,3 +332,31 @@ func (p *beginnerAsserterJoin) currentAsserter() (beginnerAsserter, bool) {
 
 	return p.asrts[p.currentIndex], true
 }
+
+type nothingBeginner struct {
+	t testReporter
+}
+
+func ExpectNothing() BeginnerMock {
+	return func(t testReporter) *Beginner {
+		asrt := nothingBeginner{
+			t: t,
+		}
+
+		return newBeginner(t, asrt)
+	}
+}
+
+func (b nothingBeginner) beginTx(context.Context, *sql.TxOptions) (tx.Tx, error) {
+	b.t.Fatal("unexpected call to beginner.BeginTx")
+
+	return nil, nil
+}
+
+func (b nothingBeginner) begin(ctx context.Context) (tx.Tx, error) {
+	b.t.Fatal("unexpected call to beginner.Begin")
+
+	return nil, nil
+}
+
+func (b nothingBeginner) assert() {}

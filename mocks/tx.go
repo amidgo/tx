@@ -186,27 +186,27 @@ func (t *rollbackAfterFailedCommit) assert() {
 }
 
 func NilTx(t testReporter) *Tx {
-	asrt := &nothing{
+	asrt := nilTx{
 		t: t,
 	}
 
 	return newTransaction(t, asrt)
 }
 
-type nothing struct {
+type nilTx struct {
 	t testReporter
 }
 
-func (n *nothing) rollback() error {
+func (n nilTx) rollback() error {
 	n.t.Fatal("unexpected call to tx.Rollback")
 
 	return nil
 }
 
-func (n *nothing) commit() error {
+func (n nilTx) commit() error {
 	n.t.Fatal("unexpected call to tx.Commit")
 
 	return nil
 }
 
-func (n *nothing) assert() {}
+func (n nilTx) assert() {}

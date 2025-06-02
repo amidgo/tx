@@ -286,6 +286,26 @@ func Test_Beginner_ExpectBeginTxAndReturnTx_CalledBegin(t *testing.T) {
 	requireNoError(t, err)
 }
 
+func Test_Beginner_ExpectNothing_CalledBegin(t *testing.T) {
+	testReporter := newMockTestReporter(t, "unexpected call to beginner.Begin")
+
+	beginner := txmocks.ExpectNothing()(testReporter)
+
+	tx, err := beginner.Begin(context.Background())
+	requireNoError(t, err)
+	requireNil(t, tx)
+}
+
+func Test_Beginner_ExpectNothing_CalledBeginTx(t *testing.T) {
+	testReporter := newMockTestReporter(t, "unexpected call to beginner.BeginTx")
+
+	beginner := txmocks.ExpectNothing()(testReporter)
+
+	tx, err := beginner.BeginTx(context.Background(), nil)
+	requireNoError(t, err)
+	requireNil(t, tx)
+}
+
 type BeginnerJoinTest struct {
 	CaseName          string
 	BeginnerTemplates []txmocks.BeginnerMock
