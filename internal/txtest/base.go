@@ -1,4 +1,4 @@
-package txtest
+package txtest_test
 
 import (
 	context "context"

@@ -8,7 +8,6 @@ import (
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
 	"github.com/amidgo/tx"
-	"github.com/amidgo/tx/internal/txtest"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
@@ -69,24 +68,24 @@ func Test_BunBeginner_Rollback_Commit(t *testing.T) {
 	tx, err := beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	txtest.AssertBunTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertBunTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	txtest.AssertBunTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertBunTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	txtest.AssertBunTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertBunTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	txtest.AssertBunTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertBunTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 }
 
 func Test_BunBeginner(t *testing.T) {
@@ -131,7 +130,7 @@ func Test_BunBeginner(t *testing.T) {
 		)
 		require.ErrorIs(t, err, errStub)
 
-		txtest.AssertUserNotFound(t, db, userID)
+		AssertUserNotFound(t, db, userID)
 	})
 
 	t.Run("no external tx, execution success, commit expected", func(t *testing.T) {
@@ -159,7 +158,7 @@ func Test_BunBeginner(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		txtest.AssertUserExists(t, db, userID, userAge)
+		AssertUserExists(t, db, userID, userAge)
 	})
 }
 
@@ -171,7 +170,7 @@ func assertBunTransactionEnabled(t *testing.T, beginner *buntx.Beginner, tx tx.T
 	_, ok := exec.(bun.Tx)
 	require.True(t, ok)
 
-	txtest.AssertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
+	AssertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
 
 	err := tx.Rollback()
 	require.NoError(t, err)

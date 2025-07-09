@@ -8,7 +8,6 @@ import (
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
 	"github.com/amidgo/tx"
-	txtest "github.com/amidgo/tx/internal/txtest"
 	sqlxtx "github.com/amidgo/tx/sqlx"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -49,7 +48,7 @@ func assertSqlxTransactionEnabled(t *testing.T, beginner *sqlxtx.Beginner, tx tx
 	_, ok := exec.(*sqlx.Tx)
 	require.True(t, ok)
 
-	txtest.AssertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
+	AssertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
 
 	err := tx.Rollback()
 	require.NoError(t, err)
@@ -79,24 +78,24 @@ func Test_SqlxBeginner_Rollback_Commit(t *testing.T) {
 	tx, err := beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	txtest.AssertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	txtest.AssertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	txtest.AssertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	txtest.AssertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	AssertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 }
 
 func Test_SqlxBeginner_WithTx(t *testing.T) {
@@ -141,7 +140,7 @@ func Test_SqlxBeginner_WithTx(t *testing.T) {
 		)
 		require.ErrorIs(t, err, errStub)
 
-		txtest.AssertUserNotFound(t, db, userID)
+		AssertUserNotFound(t, db, userID)
 	})
 
 	t.Run("no external tx, execution success, commit expected", func(t *testing.T) {
@@ -169,6 +168,6 @@ func Test_SqlxBeginner_WithTx(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		txtest.AssertUserExists(t, db, userID, userAge)
+		AssertUserExists(t, db, userID, userAge)
 	})
 }
