@@ -1,4 +1,4 @@
-package tx_test
+package txtest_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
 	"github.com/amidgo/tx"
+	txtest "github.com/amidgo/tx/internal/txtest"
 	sqltx "github.com/amidgo/tx/sql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -56,29 +57,13 @@ func assertSQLTransactionEnabled(
 	_, ok := exec.(*sql.Tx)
 	require.True(t, ok)
 
-	assertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
+	txtest.AssertSQLTransactionLevel(t, exec, expectedIsolationLevel, readOnly)
 
 	err := tx.Rollback()
 	require.NoError(t, err)
 
 	enabled = beginner.TxEnabled(tx.Context())
 	require.False(t, enabled)
-}
-
-func assertSQLTransactionLevel(t *testing.T, exec executor, expectedIsolationLevel string, readOnly bool) {
-	var isolationLevel string
-
-	err := exec.QueryRowContext(context.Background(), "SHOW transaction isolation level").Scan(&isolationLevel)
-	require.NoError(t, err)
-
-	require.Equal(t, expectedIsolationLevel, isolationLevel)
-
-	var txReadOnly transactionReadOnly
-
-	err = exec.QueryRowContext(context.Background(), "SHOW transaction_read_only").Scan(&txReadOnly)
-	require.NoError(t, err)
-
-	require.Equal(t, readOnly, txReadOnly.readOnly)
 }
 
 func Test_SQLBeginner_Rollback_Commit(t *testing.T) {
@@ -100,24 +85,24 @@ func Test_SQLBeginner_Rollback_Commit(t *testing.T) {
 	tx, err := beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	txtest.AssertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	tx, err = beginner.Begin(ctx)
 	require.NoError(t, err)
 
-	assertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	txtest.AssertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 
 	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	txtest.AssertTxCommit(t, beginner, beginner.Executor(tx.Context()), tx, db)
 
 	tx, err = beginner.BeginTx(ctx, opts)
 	require.NoError(t, err)
 
-	assertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
+	txtest.AssertTxRollback(t, beginner, beginner.Executor(tx.Context()), tx, db)
 }
 
 func Test_SQLBeginner_WithTx(t *testing.T) {
@@ -147,6 +132,11 @@ func Test_SQLBeginner_WithTx(t *testing.T) {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, 100)
 				require.NoError(t, err)
 
+				enabled := beginner.TxEnabled(ctx)
+				if enabled {
+					t.Fatalf("in WithTx ctx should be without tx, because exec is provided")
+				}
+
 				return errStub
 			},
 			&sql.TxOptions{
@@ -155,7 +145,7 @@ func Test_SQLBeginner_WithTx(t *testing.T) {
 		)
 		require.ErrorIs(t, err, errStub)
 
-		assertUserNotFound(t, db, userID)
+		txtest.AssertUserNotFound(t, db, userID)
 	})
 
 	t.Run("no external tx, execution success, commit expected", func(t *testing.T) {
@@ -170,6 +160,11 @@ func Test_SQLBeginner_WithTx(t *testing.T) {
 				_, err := exec.ExecContext(ctx, "INSERT INTO users (id, age) VALUES ($1, $2)", userID, userAge)
 				require.NoError(t, err)
 
+				enabled := beginner.TxEnabled(ctx)
+				if enabled {
+					t.Fatalf("in WithTx ctx should be without tx, because exec is provided")
+				}
+
 				return nil
 			},
 			&sql.TxOptions{
@@ -178,6 +173,6 @@ func Test_SQLBeginner_WithTx(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		assertUserExists(t, db, userID, userAge)
+		txtest.AssertUserExists(t, db, userID, userAge)
 	})
 }

@@ -113,7 +113,8 @@ func (s *Beginner) WithTx(
 		func(txContext context.Context) error {
 			exec := s.Executor(txContext)
 
-			return f(txContext, exec)
+			// must be tx without executor
+			return f(ctx, exec)
 		},
 		txOpts,
 		opts...,

@@ -48,6 +48,34 @@ func txPipelineExec(
 	return exec
 }
 
+func withTxPipelineExec(
+	tx CommitRollbacker,
+	withTxExec func() error,
+	opts ...Option,
+) func() error {
+	pipeline := makeWithTxPipeline(tx, withTxExec)
+
+	driver, _ := getDriver(tx)
+
+	if driver != nil {
+		pipeline = useDriverToTxPipeline(pipeline, driver)
+	}
+
+	exec := pipeline.exec()
+
+	options := &options{}
+
+	for _, op := range opts {
+		op(options)
+	}
+
+	if options.serializationRetryCount != 0 {
+		exec = retrySerializationExec(exec, options.serializationRetryCount)
+	}
+
+	return exec
+}
+
 func retrySerializationExec(exec func() error, serializationRetryCount int) func() error {
 	return func() error {
 		err := exec()
@@ -87,7 +115,11 @@ func useDriverToTxPipeline(pipeline txPipeline, driver Driver) txPipeline {
 
 			return driverError(driver, err)
 		},
-		rollback: pipeline.rollback,
+		rollback: func(tx Tx) error {
+			err := pipeline.rollback(tx)
+
+			return driverError(driver, err)
+		},
 	}
 }
 
@@ -105,8 +137,26 @@ func makeTxPipeline(
 		commit: func(tx Tx) error {
 			return tx.Commit()
 		},
-		rollback: func(tx Tx) {
-			_ = tx.Rollback()
+		rollback: func(tx Tx) error {
+			return tx.Rollback()
+		},
+	}
+}
+
+func makeWithTxPipeline(
+	tx CommitRollbacker,
+	exec func() error,
+) txPipeline {
+	return txPipeline{
+		begin: func() (Tx, error) {
+			return contextWrapper{tx}, nil
+		},
+		withTx: func(context.Context) error { return exec() },
+		commit: func(tx Tx) error {
+			return tx.Commit()
+		},
+		rollback: func(tx Tx) error {
+			return tx.Rollback()
 		},
 	}
 }
@@ -115,7 +165,7 @@ type txPipeline struct {
 	begin    func() (Tx, error)
 	withTx   func(txContext context.Context) error
 	commit   func(tx Tx) error
-	rollback func(tx Tx)
+	rollback func(tx Tx) error
 }
 
 func (t txPipeline) exec() func() error {
@@ -151,6 +201,14 @@ func (t txPipeline) exec() func() error {
 	}
 }
 
+func Exec(
+	tx CommitRollbacker,
+	exec func() error,
+	opts ...Option,
+) error {
+	return withTxPipelineExec(tx, exec, opts...)()
+}
+
 func Run(
 	ctx context.Context,
 	beginner Beginner,
@@ -158,15 +216,13 @@ func Run(
 	txOpts *sql.TxOptions,
 	opts ...Option,
 ) error {
-	exec := txPipelineExec(
+	return txPipelineExec(
 		ctx,
 		beginner,
 		withTx,
 		txOpts,
 		opts...,
-	)
-
-	return exec()
+	)()
 }
 
 var errSerializationRepeatTimesExcedeed = errors.New("serialization repeat times exceeded")

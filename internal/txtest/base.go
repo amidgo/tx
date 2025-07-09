@@ -1,4 +1,4 @@
-package tx_test
+package txtest
 
 import (
 	context "context"
@@ -16,21 +16,21 @@ import (
 	sqlxtx "github.com/amidgo/tx/sqlx"
 )
 
-type executor interface {
+type Executor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 var (
-	_ executor = bun.IDB(nil)
-	_ executor = sqltx.Executor(nil)
-	_ executor = sqlxtx.Executor(nil)
+	_ Executor = bun.IDB(nil)
+	_ Executor = sqltx.Executor(nil)
+	_ Executor = sqlxtx.Executor(nil)
 )
 
-func assertTxCommit(
+func AssertTxCommit(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec executor,
+	exec Executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -42,22 +42,22 @@ func assertTxCommit(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Commit()
 	require.NoError(t, err)
 
-	assertUserExists(t, db, expectedUserID, expectedUserAge)
+	AssertUserExists(t, db, expectedUserID, expectedUserAge)
 
 	enabled := txEnabled(tx.Context(), beginner)
 
 	require.False(t, enabled)
 }
 
-func assertBunTxCommit(
+func AssertBunTxCommit(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec executor,
+	exec Executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -69,21 +69,21 @@ func assertBunTxCommit(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Commit()
 	require.NoError(t, err)
 
-	assertUserExists(t, db, expectedUserID, expectedUserAge)
+	AssertUserExists(t, db, expectedUserID, expectedUserAge)
 
 	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
-func assertTxRollback(
+func AssertTxRollback(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec executor,
+	exec Executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -95,21 +95,21 @@ func assertTxRollback(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Rollback()
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, db, expectedUserID)
 
 	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
-func assertBunTxRollback(
+func AssertBunTxRollback(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec executor,
+	exec Executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -121,25 +121,25 @@ func assertBunTxRollback(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Rollback()
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, db, expectedUserID)
 
 	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
-func assertUserNotFound(t *testing.T, db *sql.DB, userID uuid.UUID) {
+func AssertUserNotFound(t *testing.T, db *sql.DB, userID uuid.UUID) {
 	id := uuid.UUID{}
 
 	err := db.QueryRowContext(context.Background(), "SELECT id FROM users WHERE id = $1", userID).Scan(&id)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
-func assertUserExists(t *testing.T, db *sql.DB, userID uuid.UUID, userAge int) {
+func AssertUserExists(t *testing.T, db *sql.DB, userID uuid.UUID, userAge int) {
 	id := uuid.UUID{}
 	age := 0
 
@@ -184,4 +184,20 @@ func txEnabled(ctx context.Context, beginner tx.Beginner) bool {
 	})
 
 	return enabled.TxEnabled(ctx)
+}
+
+func AssertSQLTransactionLevel(t *testing.T, exec Executor, expectedIsolationLevel string, readOnly bool) {
+	var isolationLevel string
+
+	err := exec.QueryRowContext(context.Background(), "SHOW transaction isolation level").Scan(&isolationLevel)
+	require.NoError(t, err)
+
+	require.Equal(t, expectedIsolationLevel, isolationLevel)
+
+	var txReadOnly transactionReadOnly
+
+	err = exec.QueryRowContext(context.Background(), "SHOW transaction_read_only").Scan(&txReadOnly)
+	require.NoError(t, err)
+
+	require.Equal(t, readOnly, txReadOnly.readOnly)
 }
