@@ -16,21 +16,21 @@ import (
 	sqlxtx "github.com/amidgo/tx/sqlx"
 )
 
-type Executor interface {
+type executor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 var (
-	_ Executor = bun.IDB(nil)
-	_ Executor = sqltx.Executor(nil)
-	_ Executor = sqlxtx.Executor(nil)
+	_ executor = bun.IDB(nil)
+	_ executor = sqltx.Executor(nil)
+	_ executor = sqlxtx.Executor(nil)
 )
 
-func AssertTxCommit(
+func assertTxCommit(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec Executor,
+	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -42,22 +42,22 @@ func AssertTxCommit(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	AssertUserNotFound(t, db, expectedUserID)
+	assertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Commit()
 	require.NoError(t, err)
 
-	AssertUserExists(t, db, expectedUserID, expectedUserAge)
+	assertUserExists(t, db, expectedUserID, expectedUserAge)
 
 	enabled := txEnabled(tx.Context(), beginner)
 
 	require.False(t, enabled)
 }
 
-func AssertBunTxCommit(
+func assertBunTxCommit(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec Executor,
+	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -69,21 +69,21 @@ func AssertBunTxCommit(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	AssertUserNotFound(t, db, expectedUserID)
+	assertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Commit()
 	require.NoError(t, err)
 
-	AssertUserExists(t, db, expectedUserID, expectedUserAge)
+	assertUserExists(t, db, expectedUserID, expectedUserAge)
 
 	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
-func AssertTxRollback(
+func assertTxRollback(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec Executor,
+	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -95,21 +95,21 @@ func AssertTxRollback(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	AssertUserNotFound(t, db, expectedUserID)
+	assertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Rollback()
 	require.NoError(t, err)
 
-	AssertUserNotFound(t, db, expectedUserID)
+	assertUserNotFound(t, db, expectedUserID)
 
 	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
-func AssertBunTxRollback(
+func assertBunTxRollback(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec Executor,
+	exec executor,
 	tx tx.Tx,
 	db *sql.DB,
 ) {
@@ -121,25 +121,25 @@ func AssertBunTxRollback(
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	AssertUserNotFound(t, db, expectedUserID)
+	assertUserNotFound(t, db, expectedUserID)
 
 	err = tx.Rollback()
 	require.NoError(t, err)
 
-	AssertUserNotFound(t, db, expectedUserID)
+	assertUserNotFound(t, db, expectedUserID)
 
 	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
-func AssertUserNotFound(t *testing.T, db *sql.DB, userID uuid.UUID) {
+func assertUserNotFound(t *testing.T, db *sql.DB, userID uuid.UUID) {
 	id := uuid.UUID{}
 
 	err := db.QueryRowContext(context.Background(), "SELECT id FROM users WHERE id = $1", userID).Scan(&id)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
-func AssertUserExists(t *testing.T, db *sql.DB, userID uuid.UUID, userAge int) {
+func assertUserExists(t *testing.T, db *sql.DB, userID uuid.UUID, userAge int) {
 	id := uuid.UUID{}
 	age := 0
 
@@ -186,7 +186,7 @@ func txEnabled(ctx context.Context, beginner tx.Beginner) bool {
 	return enabled.TxEnabled(ctx)
 }
 
-func AssertSQLTransactionLevel(t *testing.T, exec Executor, expectedIsolationLevel string, readOnly bool) {
+func assertSQLTransactionLevel(t *testing.T, exec executor, expectedIsolationLevel string, readOnly bool) {
 	var isolationLevel string
 
 	err := exec.QueryRowContext(context.Background(), "SHOW transaction isolation level").Scan(&isolationLevel)
