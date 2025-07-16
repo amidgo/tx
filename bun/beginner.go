@@ -55,7 +55,7 @@ func NewBeginner(db *bun.DB) *Beginner {
 }
 
 func (s *Beginner) Begin(ctx context.Context) (ttn.Tx, error) {
-	bunTx, err := s.db.Begin()
+	bunTx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

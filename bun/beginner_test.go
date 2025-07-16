@@ -3,16 +3,20 @@ package buntx_test
 import (
 	context "context"
 	sql "database/sql"
+
 	"errors"
 	"testing"
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
+	"github.com/amidgo/containers/postgres/migrations"
+	pgrunner "github.com/amidgo/containers/postgres/runner"
 	"github.com/amidgo/tx"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 
+	"github.com/amidgo/tx/internal/reusable"
 	txtest "github.com/amidgo/tx/internal/testing"
 
 	buntx "github.com/amidgo/tx/bun"
@@ -23,7 +27,7 @@ func Test_BunBeginner_Begin_BeginTx(t *testing.T) {
 
 	ctx := context.Background()
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
+	db := postgrescontainer.ReuseForTesting(t, reusable.Postgres(), migrations.Nil)
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
@@ -61,7 +65,11 @@ func Test_BunBeginner_Rollback_Commit(t *testing.T) {
 
 	ctx := context.Background()
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+		createUsersTableQuery,
+	)
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
@@ -118,7 +126,11 @@ func Test_BunBeginner_WithTx(t *testing.T) {
 
 	errStub := errors.New("stub err")
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+		createUsersTableQuery,
+	)
 
 	bunDB := bun.NewDB(db, pgdialect.New())
 
@@ -195,4 +207,24 @@ func assertBunTransactionEnabled(t *testing.T, beginner *buntx.Beginner, tx tx.T
 
 	enabled = beginner.TxEnabled(tx.Context())
 	require.False(t, enabled)
+}
+
+func Test_BunBeginner_Error(t *testing.T) {
+	t.Parallel()
+
+	reusable := postgrescontainer.NewReusable(pgrunner.RunContainer(nil))
+
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable,
+		migrations.Nil,
+	)
+
+	bunDB := bun.NewDB(db, pgdialect.New())
+
+	beginner := buntx.NewBeginner(bunDB)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	txtest.AssertBeginError(t, ctx, beginner, nil, context.Canceled)
 }

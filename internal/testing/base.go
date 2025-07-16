@@ -208,3 +208,29 @@ func AssertSQLTransactionLevel(t *testing.T, exec Executor, expectedIsolationLev
 
 	require.Equal(t, readOnly, txReadOnly.readOnly)
 }
+
+func AssertBeginError(
+	t *testing.T,
+	ctx context.Context,
+	beginner tx.Beginner,
+	txOpts *sql.TxOptions,
+	expectedBeginError error,
+) {
+	tx, err := beginner.Begin(ctx)
+	if !errors.Is(err, expectedBeginError) {
+		t.Fatalf("assert beginner.Begin error, not match\n\nexpected:\n%s\n\nactual:\n%s", expectedBeginError, err)
+	}
+
+	if tx != nil {
+		t.Fatal("assert beginner.Begin tx is nil on error, unexpected non nil tx")
+	}
+
+	tx, err = beginner.BeginTx(ctx, txOpts)
+	if !errors.Is(err, expectedBeginError) {
+		t.Fatalf("assert beginner.BeginTx error, not match\n\nexpected:\n%s\n\nactual:\n%s", expectedBeginError, err)
+	}
+
+	if tx != nil {
+		t.Fatal("assert beginner.BeginTx tx is nil on error, unexpected non nil tx")
+	}
+}

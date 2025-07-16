@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
+	"github.com/amidgo/containers/postgres/migrations"
+	pgrunner "github.com/amidgo/containers/postgres/runner"
 	"github.com/amidgo/tx"
+	"github.com/amidgo/tx/internal/reusable"
 	txtest "github.com/amidgo/tx/internal/testing"
 	sqlxtx "github.com/amidgo/tx/sqlx"
 	"github.com/google/uuid"
@@ -20,7 +23,11 @@ func Test_SqlxBeginner_Begin_BeginTx(t *testing.T) {
 
 	ctx := context.Background()
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+	)
+
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
 	beginner := sqlxtx.NewBeginner(sqlxDB)
@@ -70,7 +77,11 @@ func Test_SqlxBeginner_Rollback_Commit(t *testing.T) {
 
 	ctx := context.Background()
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+		createUsersTableQuery,
+	)
 
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
@@ -111,7 +122,11 @@ func Test_SqlxBeginner_WithTx(t *testing.T) {
 
 	errStub := errors.New("stub err")
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+		createUsersTableQuery,
+	)
 
 	sqlxDB := sqlx.NewDb(db, "pgx")
 
@@ -171,4 +186,24 @@ func Test_SqlxBeginner_WithTx(t *testing.T) {
 
 		txtest.AssertUserExists(t, db, userID, userAge)
 	})
+}
+
+func Test_SqlxBeginner_Error(t *testing.T) {
+	t.Parallel()
+
+	reusable := postgrescontainer.NewReusable(pgrunner.RunContainer(nil))
+
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable,
+		migrations.Nil,
+	)
+
+	sqlxDB := sqlx.NewDb(db, "pgx")
+
+	beginner := sqlxtx.NewBeginner(sqlxDB)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	txtest.AssertBeginError(t, ctx, beginner, nil, context.Canceled)
 }

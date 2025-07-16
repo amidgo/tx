@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
+	"github.com/amidgo/containers/postgres/migrations"
 	"github.com/amidgo/tx"
+	"github.com/amidgo/tx/internal/reusable"
 	pgxtx "github.com/amidgo/tx/pgx"
 )
 
@@ -20,7 +22,10 @@ func Test_Driver(t *testing.T) {
 
 func driverSerializationTest(t *testing.T) {
 	t.Parallel()
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{},
+
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
 		"create table tx_serializable_sums(num integer)",
 	)
 
@@ -72,7 +77,9 @@ func driverSerializationTest(t *testing.T) {
 func driverRepeatableReadTest(t *testing.T) {
 	t.Parallel()
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{},
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
 		`
 CREATE TABLE accounts (
     id INT PRIMARY KEY,

@@ -7,11 +7,14 @@ import (
 	"testing"
 
 	postgrescontainer "github.com/amidgo/containers/postgres"
+	"github.com/amidgo/containers/postgres/migrations"
+	pgrunner "github.com/amidgo/containers/postgres/runner"
 	"github.com/amidgo/tx"
 	sqltx "github.com/amidgo/tx/sql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/amidgo/tx/internal/reusable"
 	txtest "github.com/amidgo/tx/internal/testing"
 )
 
@@ -20,7 +23,10 @@ func Test_SQLBeginner_Begin_BeginTx(t *testing.T) {
 
 	ctx := context.Background()
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{})
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+	)
 
 	beginner := sqltx.NewBeginner(db)
 
@@ -79,7 +85,11 @@ func Test_SQLBeginner_Rollback_Commit(t *testing.T) {
 
 	ctx := context.Background()
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+		createUsersTableQuery,
+	)
 
 	beginner := sqltx.NewBeginner(db)
 
@@ -118,7 +128,11 @@ func Test_SQLBeginner_WithTx(t *testing.T) {
 
 	errStub := errors.New("stub err")
 
-	db := postgrescontainer.RunForTesting(t, postgrescontainer.EmptyMigrations{}, createUsersTableQuery)
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable.Postgres(),
+		migrations.Nil,
+		createUsersTableQuery,
+	)
 
 	beginner := sqltx.NewBeginner(db)
 
@@ -176,4 +190,22 @@ func Test_SQLBeginner_WithTx(t *testing.T) {
 
 		txtest.AssertUserExists(t, db, userID, userAge)
 	})
+}
+
+func Test_SQLBeginner_Error(t *testing.T) {
+	t.Parallel()
+
+	reusable := postgrescontainer.NewReusable(pgrunner.RunContainer(nil))
+
+	db := postgrescontainer.ReuseForTesting(t,
+		reusable,
+		migrations.Nil,
+	)
+
+	beginner := sqltx.NewBeginner(db)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	txtest.AssertBeginError(t, ctx, beginner, nil, context.Canceled)
 }
