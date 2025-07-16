@@ -93,7 +93,7 @@ func retrySerializationExec(exec func() error, serializationRetryCount int) func
 			return err
 		}
 
-		return errors.Join(errSerializationRepeatTimesExcedeed, err)
+		return errors.Join(ErrSerializationRepeatTimesExcedeed, err)
 	}
 }
 
@@ -225,7 +225,7 @@ func Run(
 	)()
 }
 
-var errSerializationRepeatTimesExcedeed = errors.New("serialization repeat times exceeded")
+var ErrSerializationRepeatTimesExcedeed = errors.New("serialization repeat times exceeded")
 
 func driverError(driver Driver, err error) error {
 	if err == nil {
