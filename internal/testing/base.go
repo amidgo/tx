@@ -1,4 +1,4 @@
-package txtest_test
+package txtest
 
 import (
 	context "context"
@@ -16,134 +16,141 @@ import (
 	sqlxtx "github.com/amidgo/tx/sqlx"
 )
 
-type executor interface {
+type Executor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 var (
-	_ executor = bun.IDB(nil)
-	_ executor = sqltx.Executor(nil)
-	_ executor = sqlxtx.Executor(nil)
+	_ Executor = bun.IDB(nil)
+	_ Executor = sqltx.Executor(nil)
+	_ Executor = sqlxtx.Executor(nil)
 )
 
-func assertTxCommit(
+type placeholder string
+
+const (
+	quesionMarkPlaceholder placeholder = "?"
+)
+
+type txTestOptions struct {
+	placeholder placeholder
+}
+
+func WithQuestionMarkPlaceholder(opts *txTestOptions) {
+	opts.placeholder = quesionMarkPlaceholder
+}
+
+type Option func(*txTestOptions)
+
+func makeTxTestOpts(opts ...Option) *txTestOptions {
+	txTestOpts := new(txTestOptions)
+
+	for _, op := range opts {
+		op(txTestOpts)
+	}
+
+	return txTestOpts
+}
+
+func AssertTxCommit(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec executor,
+	exec Executor,
 	tx tx.Tx,
-	db *sql.DB,
+	nonTxExec Executor,
+	opts ...Option,
 ) {
 	expectedUserID := uuid.New()
 	expectedUserAge := 10
 
-	const insertUserQuery = "INSERT INTO users (id, age) VALUES ($1, $2)"
+	insertUserQuery := "INSERT INTO users (id, age) VALUES ($1, $2)"
+
+	if makeTxTestOpts(opts...).placeholder == quesionMarkPlaceholder {
+		insertUserQuery = "INSERT INTO users (id, age) VALUES (?, ?)"
+	}
 
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, nonTxExec, expectedUserID, opts...)
 
 	err = tx.Commit()
 	require.NoError(t, err)
 
-	assertUserExists(t, db, expectedUserID, expectedUserAge)
+	AssertUserExists(t, nonTxExec, expectedUserID, expectedUserAge, opts...)
 
 	enabled := txEnabled(tx.Context(), beginner)
 
 	require.False(t, enabled)
 }
 
-func assertBunTxCommit(
+func AssertTxRollback(
 	t *testing.T,
 	beginner tx.Beginner,
-	exec executor,
+	exec Executor,
 	tx tx.Tx,
-	db *sql.DB,
+	nonTxExec Executor,
+	opts ...Option,
 ) {
 	expectedUserID := uuid.New()
 	expectedUserAge := 10
 
-	const insertUserQuery = "INSERT INTO users (id, age) VALUES (?, ?)"
+	insertUserQuery := "INSERT INTO users (id, age) VALUES ($1, $2)"
+
+	if makeTxTestOpts(opts...).placeholder == quesionMarkPlaceholder {
+		insertUserQuery = "INSERT INTO users (id, age) VALUES (?, ?)"
+	}
 
 	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
-
-	err = tx.Commit()
-	require.NoError(t, err)
-
-	assertUserExists(t, db, expectedUserID, expectedUserAge)
-
-	enabled := txEnabled(tx.Context(), beginner)
-	require.False(t, enabled)
-}
-
-func assertTxRollback(
-	t *testing.T,
-	beginner tx.Beginner,
-	exec executor,
-	tx tx.Tx,
-	db *sql.DB,
-) {
-	expectedUserID := uuid.New()
-	expectedUserAge := 10
-
-	const insertUserQuery = "INSERT INTO users (id, age) VALUES ($1, $2)"
-
-	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
-	require.NoError(t, err)
-
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, nonTxExec, expectedUserID, opts...)
 
 	err = tx.Rollback()
 	require.NoError(t, err)
 
-	assertUserNotFound(t, db, expectedUserID)
+	AssertUserNotFound(t, nonTxExec, expectedUserID, opts...)
 
 	enabled := txEnabled(tx.Context(), beginner)
 	require.False(t, enabled)
 }
 
-func assertBunTxRollback(
+func AssertUserNotFound(
 	t *testing.T,
-	beginner tx.Beginner,
-	exec executor,
-	tx tx.Tx,
-	db *sql.DB,
+	exec Executor,
+	userID uuid.UUID,
+	opts ...Option,
 ) {
-	expectedUserID := uuid.New()
-	expectedUserAge := 10
-
-	const insertUserQuery = "INSERT INTO users (id, age) VALUES (?, ?)"
-
-	_, err := exec.ExecContext(tx.Context(), insertUserQuery, expectedUserID, expectedUserAge)
-	require.NoError(t, err)
-
-	assertUserNotFound(t, db, expectedUserID)
-
-	err = tx.Rollback()
-	require.NoError(t, err)
-
-	assertUserNotFound(t, db, expectedUserID)
-
-	enabled := txEnabled(tx.Context(), beginner)
-	require.False(t, enabled)
-}
-
-func assertUserNotFound(t *testing.T, db *sql.DB, userID uuid.UUID) {
 	id := uuid.UUID{}
 
-	err := db.QueryRowContext(context.Background(), "SELECT id FROM users WHERE id = $1", userID).Scan(&id)
+	query := "SELECT id FROM users WHERE id = $1"
+
+	if makeTxTestOpts(opts...).placeholder == quesionMarkPlaceholder {
+		query = "SELECT id FROM users WHERE id = ?"
+	}
+
+	err := exec.QueryRowContext(context.Background(), query, userID).Scan(&id)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
-func assertUserExists(t *testing.T, db *sql.DB, userID uuid.UUID, userAge int) {
+func AssertUserExists(
+	t *testing.T,
+	exec Executor,
+	userID uuid.UUID,
+	userAge int,
+	opts ...Option,
+) {
 	id := uuid.UUID{}
 	age := 0
 
-	err := db.QueryRow("SELECT id,age FROM users WHERE id = $1", userID).Scan(&id, &age)
+	query := "SELECT id, age FROM users WHERE id = $1"
+
+	if makeTxTestOpts(opts...).placeholder == quesionMarkPlaceholder {
+		query = "SELECT id, age FROM users WHERE id = ?"
+	}
+
+	err := exec.QueryRowContext(context.Background(), query, userID).Scan(&id, &age)
 	require.NoError(t, err)
 
 	require.Equal(t, userID, id)
@@ -186,7 +193,7 @@ func txEnabled(ctx context.Context, beginner tx.Beginner) bool {
 	return enabled.TxEnabled(ctx)
 }
 
-func assertSQLTransactionLevel(t *testing.T, exec executor, expectedIsolationLevel string, readOnly bool) {
+func AssertSQLTransactionLevel(t *testing.T, exec Executor, expectedIsolationLevel string, readOnly bool) {
 	var isolationLevel string
 
 	err := exec.QueryRowContext(context.Background(), "SHOW transaction isolation level").Scan(&isolationLevel)

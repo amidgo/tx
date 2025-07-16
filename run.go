@@ -182,7 +182,7 @@ func (t txPipeline) exec() func() error {
 				return
 			}
 
-			t.rollback(tx)
+			_ = t.rollback(tx)
 		}()
 
 		err = t.withTx(tx.Context())
